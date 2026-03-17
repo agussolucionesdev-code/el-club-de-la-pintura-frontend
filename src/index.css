@@ -2,8 +2,19 @@
 @tailwind components;
 @tailwind utilities;
 
-html {
+/* 1. SELECCIÓN DE TEXTO NEURO-VISUAL */
+::selection {
+  background-color: #f59e0b;
+  color: #0f172a;
+  text-shadow: none;
+}
+
+/* 2. MOTOR 3D FLUIDO (Aceleración por Hardware) */
+.card-3d-wrapper {
+  transform: perspective(1200px) rotateX(var(--rx, 0deg))
+    rotateY(var(--ry, 0deg)) scale3d(var(--scale, 1), var(--scale, 1), 1);
   transition:
-    background-color 0.3s ease,
-    color 0.3s ease;
+    transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275),
+    box-shadow 0.3s ease;
+  will-change: transform;
 }
