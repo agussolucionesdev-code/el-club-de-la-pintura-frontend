@@ -1,4 +1,6 @@
+// Importación de dependencias de React
 import React, { useState, useEffect, useRef, useCallback } from "react";
+// Importación estricta de iconografía utilizada (Lucide React)
 import {
   Search,
   Filter,
@@ -24,27 +26,33 @@ import {
   MinusCircle,
   PlusCircle,
 } from "lucide-react";
+
+// Importación de contextos y componentes del ecosistema
 import { useAuth } from "../../../core/context/AuthContext";
 import { ProductModal } from "../components/ProductModal";
 import type { Product } from "../components/ProductModal";
 import { ProductViewModal } from "../components/ProductViewModal";
 import { CyberHeader } from "../../../shared/components/CyberHeader";
 
-// FORZAMOS EL PUERTO 4000 PARA EVITAR CACHÉ DE VITE
-const API_URL = "http://localhost:4000/api";
+// Definición de variable de entorno para conexión a API
+const API_URL = "http://127.0.0.1:4000/api";
 
 export const ProductsPage = () => {
+  // Obtención de sesión de usuario y credenciales
   const { user } = useAuth();
   const token = localStorage.getItem("club_token");
 
+  // Extracción de nombre de usuario para personalización de UI
   const userName = user?.name ? user.name.split(" ")[0] : "Admin";
 
+  // Configuración de textos dinámicos para CyberHeader
   const phrases = [
     `Gestión de inventario activa, ${userName}. Servidor principal operativo.`,
     `Catálogo sincronizado. ¿Qué ajustamos hoy, ${userName}?`,
     `Trazabilidad perfecta. Datos seguros y encriptados.`,
   ];
 
+  // Configuración de etiquetas dinámicas para CyberHeader
   const tags = [
     {
       text: "Stock Inteligente",
@@ -68,41 +76,50 @@ export const ProductsPage = () => {
     },
   ];
 
+  // Inicialización de estados principales de datos
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Inicialización de estados de filtrado y búsqueda
   const [searchTerm, setSearchTerm] = useState("");
   const [showFilters, setShowFilters] = useState(false);
   const [filterCategory, setFilterCategory] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
 
+  // Inicialización de estados para control de Modales
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [productToEdit, setProductToEdit] = useState<Product | null>(null);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [productToView, setProductToView] = useState<Product | null>(null);
 
+  // Inicialización de estados para confirmaciones de borrado
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
   const [deleteAllConfirm, setDeleteAllConfirm] = useState(false);
 
+  // Inicialización de estados para ajuste rápido de stock
   const [fastStockProduct, setFastStockProduct] = useState<Product | null>(
     null,
   );
   const [fastStockQuantity, setFastStockQuantity] = useState<number>(0);
 
+  // Referencias y estados de carga de archivos Excel
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingExcel, setIsUploadingExcel] = useState(false);
 
+  // Inicialización de estados de paginación y selección
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
 
+  // Inicialización de sistema de notificaciones (Toasts)
   const [toast, setToast] = useState<{
     show: boolean;
     msg: string;
     type: "success" | "error";
   }>({ show: false, msg: "", type: "success" });
 
-  // SOLUCIÓN 1: Envolvemos showToast en useCallback para estabilizarla en memoria
+  // Implementación de disparador de notificaciones estabilizado en memoria
   const showToast = useCallback(
     (msg: string, type: "success" | "error" = "success") => {
       setToast({ show: true, msg, type });
@@ -114,13 +131,9 @@ export const ProductsPage = () => {
     [],
   );
 
-  // SOLUCIÓN 2: Envolvemos fetchProducts en useCallback para poder agregarla como dependencia
+  // Petición HTTP para obtención de catálogo completo
   const fetchProducts = useCallback(async () => {
     setIsLoading(true);
-    console.log(
-      "🛠️ DIAGNÓSTICO: Intentando conectar a:",
-      `${API_URL}/products?limit=1000`,
-    );
     try {
       const response = await fetch(`${API_URL}/products?limit=1000`, {
         headers: {
@@ -128,34 +141,41 @@ export const ProductsPage = () => {
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
       });
-      if (!response.ok) throw new Error("Error");
+      if (!response.ok) throw new Error("Error en petición");
       const jsonResponse = await response.json();
-      if (jsonResponse && Array.isArray(jsonResponse.data))
+
+      // Mapeo seguro de respuesta estructural
+      if (jsonResponse && Array.isArray(jsonResponse.data)) {
         setProducts(jsonResponse.data);
-      else if (Array.isArray(jsonResponse)) setProducts(jsonResponse);
-      else setProducts([]);
+      } else if (Array.isArray(jsonResponse)) {
+        setProducts(jsonResponse);
+      } else {
+        setProducts([]);
+      }
     } catch (error) {
       console.error("Fallo la conexión:", error);
       showToast(
-        "El servidor Backend (Puerto 4000) no responde. ¿Está encendido?",
+        "El servidor Backend no responde. ¿Está encendido el puerto 4000?",
         "error",
       );
     } finally {
       setIsLoading(false);
     }
-  }, [token, showToast]); // Agregamos sus dependencias internas
+  }, [token, showToast]);
 
-  // SOLUCIÓN 3: Ahora podemos declarar fetchProducts en el array sin provocar bucles infinitos
+  // Ejecución de sincronización inicial al montar componente
   useEffect(() => {
     fetchProducts();
   }, [fetchProducts]);
 
+  // Manejo de creación o actualización de producto desde el Modal
   const handleSaveProduct = async (productData: Product) => {
     try {
       const isEditing = !!productToEdit && !!productData.id;
       const endpoint = isEditing
         ? `${API_URL}/products/${productData.id}`
         : `${API_URL}/products`;
+
       const response = await fetch(endpoint, {
         method: isEditing ? "PUT" : "POST",
         headers: {
@@ -164,36 +184,47 @@ export const ProductsPage = () => {
         },
         body: JSON.stringify(productData),
       });
-      if (!response.ok) throw new Error("Error");
+
+      if (!response.ok) throw new Error("Error en servidor");
+
       await fetchProducts();
       setIsModalOpen(false);
-      showToast(isEditing ? "Actualizado con éxito" : "Guardado con éxito!");
+      showToast(
+        isEditing
+          ? "Catálogo actualizado con éxito"
+          : "Producto ingresado con éxito!",
+      );
     } catch (error) {
-      console.log(error);
-
-      showToast("Error al guardar", "error");
+      console.error(error);
+      showToast("Error de sincronización al guardar", "error");
     }
   };
 
+  // Implementación de lógica de ajuste rápido de stock (Chichita verde)
   const handleFastStockUpdate = async () => {
     if (!fastStockProduct || fastStockQuantity === 0) return;
 
+    // Cálculo de stock real utilizando fallback de seguridad
     const currentStock =
       fastStockProduct.metadata?.initialStockImported !== undefined
         ? Number(fastStockProduct.metadata.initialStockImported)
         : Number(fastStockProduct.stock || 0);
+
     const newStock = currentStock + fastStockQuantity;
 
+    // Prevención de saldos negativos
     if (newStock < 0) {
-      showToast("El stock final no puede ser negativo.", "error");
+      showToast("El nivel de stock no puede ser negativo.", "error");
       return;
     }
 
+    // Recálculo automático de semáforo de inventario
     let calculatedStatus = "optimal";
     if (newStock === 0) calculatedStatus = "out";
     else if (newStock <= 5) calculatedStatus = "critical";
     else if (newStock <= 15) calculatedStatus = "warning";
 
+    // Conformación de payload actualizado
     const updatedProduct = {
       ...fastStockProduct,
       stock: newStock,
@@ -205,25 +236,31 @@ export const ProductsPage = () => {
     };
 
     try {
-      await fetch(`${API_URL}/products/${fastStockProduct.id}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      const response = await fetch(
+        `${API_URL}/products/${fastStockProduct.id}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify(updatedProduct),
         },
-        body: JSON.stringify(updatedProduct),
-      });
+      );
+
+      if (!response.ok) throw new Error("Error en actualización");
+
       await fetchProducts();
       setFastStockProduct(null);
       setFastStockQuantity(0);
-      showToast("Stock ajustado correctamente.");
+      showToast("Niveles de inventario ajustados correctamente.");
     } catch (error) {
-      console.log(error);
-
-      showToast("Error al ajustar el stock.", "error");
+      console.error(error);
+      showToast("Error al procesar el ajuste de stock.", "error");
     }
   };
 
+  // Manejo de petición de archivado lógico (Borrado individual)
   const handleDeleteProduct = async (id: string) => {
     try {
       await fetch(`${API_URL}/products/${id}`, {
@@ -235,12 +272,12 @@ export const ProductsPage = () => {
       setSelectedIds((prev) => prev.filter((selId) => selId !== id));
       showToast("Producto archivado del catálogo.");
     } catch (error) {
-      console.log(error);
-
-      showToast("Error al eliminar", "error");
+      console.error(error);
+      showToast("Error de comunicación al eliminar", "error");
     }
   };
 
+  // Manejo de petición de archivado lógico por lotes (Borrado masivo)
   const handleBulkDelete = async () => {
     setIsLoading(true);
     setBulkDeleteConfirm(false);
@@ -259,14 +296,14 @@ export const ProductsPage = () => {
       setSelectedIds([]);
       showToast(`${selectedIds.length} productos archivados.`);
     } catch (error) {
-      console.log(error);
-
-      showToast("Error en el borrado masivo.", "error");
+      console.error(error);
+      showToast("Error en ejecución de borrado masivo.", "error");
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Manejo de petición de purga completa de base de datos visual
   const handleDeleteAll = async () => {
     setIsLoading(true);
     setDeleteAllConfirm(false);
@@ -285,14 +322,14 @@ export const ProductsPage = () => {
       setCurrentPage(1);
       showToast(`Catálogo vaciado. ${allIds.length} registros archivados.`);
     } catch (error) {
-      console.log(error);
-
-      showToast("Error al vaciar catálogo.", "error");
+      console.error(error);
+      showToast("Error crítico al vaciar catálogo.", "error");
     } finally {
       setIsLoading(false);
     }
   };
 
+  // Procesamiento de importación masiva mediante archivo Excel
   const handleExcelUpload = async (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
@@ -307,18 +344,19 @@ export const ProductsPage = () => {
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
-      if (!response.ok) throw new Error("Error en el Excel");
+      if (!response.ok) throw new Error("Error en lectura de Excel");
       await fetchProducts();
-      showToast("¡Inventario importado exitosamente!");
+      showToast("¡Inventario maestro importado exitosamente!");
     } catch (error) {
-      console.log(error);
-      showToast("Error estructural en el archivo.", "error");
+      console.error(error);
+      showToast("Error estructural en el archivo importado.", "error");
     } finally {
       setIsUploadingExcel(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
+  // Construcción visual de semáforo de estados
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "optimal":
@@ -354,18 +392,24 @@ export const ProductsPage = () => {
     }
   };
 
+  // Ejecución del motor de filtrado cruzado en memoria
   const filteredProducts = products.filter((p) => {
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch =
       (p.name && p.name.toLowerCase().includes(searchLower)) ||
       (p.sku && p.sku.toLowerCase().includes(searchLower)) ||
       (p.barcode && String(p.barcode).toLowerCase().includes(searchLower));
+
     const matchesCategory =
       filterCategory === "" || p.category === filterCategory;
+
+    // Extracción de saldo real
     const realStock =
       p.metadata?.initialStockImported !== undefined
         ? Number(p.metadata.initialStockImported)
         : Number(p.stock || 0);
+
+    // Inferencia de estado ante posibles nulos
     const computedStatus =
       p.status ||
       (realStock === 0
@@ -375,17 +419,21 @@ export const ProductsPage = () => {
           : realStock <= 15
             ? "warning"
             : "optimal");
+
     const matchesStatus =
       filterStatus === "" || computedStatus === filterStatus;
+
     return matchesSearch && matchesCategory && matchesStatus;
   });
 
+  // Cálculo de índices de paginación
   const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
   const paginatedProducts = filteredProducts.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage,
   );
 
+  // Manejo de eventos de selección múltiple (Checkbox All)
   const toggleSelectAll = () => {
     if (selectedIds.length === paginatedProducts.length) {
       setSelectedIds([]);
@@ -394,6 +442,7 @@ export const ProductsPage = () => {
     }
   };
 
+  // Manejo de eventos de selección individual (Checkbox Row)
   const toggleSelect = (id: string) => {
     if (selectedIds.includes(id)) {
       setSelectedIds(selectedIds.filter((selId) => selId !== id));
@@ -402,10 +451,13 @@ export const ProductsPage = () => {
     }
   };
 
+  // Renderizado principal del componente (Vista)
   return (
     <div className="relative min-h-full bg-[#F4F7F9] dark:bg-[#030712] p-4 md:p-6 lg:p-10 overflow-hidden transition-colors duration-700 w-full">
+      {/* Decoración de fondo */}
       <div className="absolute top-[-10%] right-[-10%] w-[50rem] h-[50rem] bg-amber-400/10 dark:bg-brand/5 rounded-full blur-[150px] opacity-70 pointer-events-none"></div>
 
+      {/* Input oculto para subida de archivos */}
       <input
         type="file"
         ref={fileInputRef}
@@ -414,7 +466,7 @@ export const ProductsPage = () => {
         className="hidden"
       />
 
-      {/* TOAST NOTIFICATIONS */}
+      {/* Renderizado de Centro de Notificaciones (Toasts) */}
       <div
         className={`fixed top-6 right-6 z-[200] transition-all duration-500 transform ${toast.show ? "translate-y-0 opacity-100" : "-translate-y-10 opacity-0 pointer-events-none"}`}
       >
@@ -430,7 +482,7 @@ export const ProductsPage = () => {
         </div>
       </div>
 
-      {/* MODAL INGRESO RÁPIDO DE STOCK */}
+      {/* Renderizado de Modal: Ingreso Rápido de Stock */}
       {fastStockProduct && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
           <div
@@ -495,7 +547,7 @@ export const ProductsPage = () => {
         </div>
       )}
 
-      {/* MODAL BORRADO INDIVIDUAL */}
+      {/* Renderizado de Modal: Confirmación de Borrado Individual */}
       {deleteConfirm && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
           <div
@@ -531,7 +583,7 @@ export const ProductsPage = () => {
         </div>
       )}
 
-      {/* MODAL BORRADO MASIVO */}
+      {/* Renderizado de Modal: Confirmación de Borrado Masivo */}
       {bulkDeleteConfirm && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
           <div
@@ -567,7 +619,7 @@ export const ProductsPage = () => {
         </div>
       )}
 
-      {/* MODAL VACIAR CATÁLOGO */}
+      {/* Renderizado de Modal: Purgar Catálogo Completo */}
       {deleteAllConfirm && (
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
           <div
@@ -604,7 +656,9 @@ export const ProductsPage = () => {
         </div>
       )}
 
+      {/* Contenedor Principal de la Interfaz */}
       <div className="relative z-10 max-w-[1400px] mx-auto w-full">
+        {/* Renderizado de Cabecera Personalizada */}
         <CyberHeader
           phrases={phrases}
           labelIcon={Box}
@@ -612,10 +666,12 @@ export const ProductsPage = () => {
           tags={tags}
         />
 
+        {/* Panel de Herramientas de Control Superior */}
         <div
           className="flex flex-col lg:flex-row justify-between items-center gap-4 mb-6 opacity-0 animate-fade-in-up"
           style={{ animationDelay: "600ms" }}
         >
+          {/* Motor de Búsqueda Textual */}
           <div className="relative w-full lg:w-2/5 group">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
               <Search
@@ -635,6 +691,7 @@ export const ProductsPage = () => {
             />
           </div>
 
+          {/* Botonera de Acciones Globales */}
           <div className="flex w-full lg:w-auto flex-wrap sm:flex-nowrap gap-3">
             <button
               onClick={() => setDeleteAllConfirm(true)}
@@ -685,6 +742,7 @@ export const ProductsPage = () => {
           </div>
         </div>
 
+        {/* Panel de Control de Selección Múltiple */}
         {selectedIds.length > 0 && (
           <div className="mb-6 p-4 bg-gradient-to-r from-red-50 to-white dark:from-red-900/20 dark:to-[#0a0f1c] border border-red-200 dark:border-red-800/50 rounded-2xl flex items-center justify-between animate-fade-in-up shadow-sm">
             <span className="text-sm font-black text-red-700 dark:text-red-400 flex items-center">
@@ -701,6 +759,7 @@ export const ProductsPage = () => {
           </div>
         )}
 
+        {/* Renderizado Condicional de Filtros Avanzados */}
         {showFilters && (
           <div className="mt-2 mb-6 p-6 bg-white/60 dark:bg-slate-900/40 backdrop-blur-xl border border-slate-200/50 dark:border-slate-700/50 rounded-[1.5rem] shadow-lg flex flex-col sm:flex-row gap-5 animate-fade-in-up">
             <div className="flex-1">
@@ -757,12 +816,14 @@ export const ProductsPage = () => {
           </div>
         )}
 
+        {/* Estructura Principal de la Tabla de Datos */}
         <div
           className="w-full bg-white/80 dark:bg-[#0a0f1c]/80 backdrop-blur-2xl border border-slate-200/50 dark:border-slate-800 rounded-[2rem] shadow-[0_8px_30px_rgb(0,0,0,0.04)] dark:shadow-[0_8px_30px_rgba(0,0,0,0.5)] overflow-hidden opacity-0 animate-fade-in-up"
           style={{ animationDelay: "800ms" }}
         >
           <div className="overflow-x-auto custom-scrollbar">
             <table className="w-full text-left border-collapse min-w-[1000px]">
+              {/* Cabecera de la Tabla */}
               <thead>
                 <tr className="bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-100 dark:border-slate-800">
                   <th className="px-6 py-5 text-center w-12">
@@ -796,6 +857,8 @@ export const ProductsPage = () => {
                   </th>
                 </tr>
               </thead>
+
+              {/* Cuerpo de la Tabla */}
               <tbody className="divide-y divide-slate-50 dark:divide-slate-800/50">
                 {isLoading ? (
                   <tr>
@@ -833,10 +896,12 @@ export const ProductsPage = () => {
                   </tr>
                 ) : (
                   paginatedProducts.map((product) => {
+                    // Verificación robusta de niveles para el renderizado
                     const realStock =
                       product.metadata?.initialStockImported !== undefined
                         ? Number(product.metadata.initialStockImported)
                         : Number(product.stock || 0);
+
                     const currentStatus =
                       product.status ||
                       (realStock === 0
@@ -864,11 +929,13 @@ export const ProductsPage = () => {
                             className="w-4 h-4 rounded border-slate-300 text-brand focus:ring-brand cursor-pointer"
                           />
                         </td>
+
+                        {/* Corrección Arquitectónica: Manejo seguro de array de imágenes */}
                         <td className="px-2 py-5 whitespace-nowrap">
                           <div className="w-12 h-12 rounded-[1rem] bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 flex items-center justify-center overflow-hidden shadow-sm group-hover:shadow-md transition-shadow">
-                            {product.image ? (
+                            {product.images && product.images.length > 0 ? (
                               <img
-                                src={product.image}
+                                src={product.images[0]}
                                 alt={product.name}
                                 className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                               />
@@ -880,6 +947,7 @@ export const ProductsPage = () => {
                             )}
                           </div>
                         </td>
+
                         <td className="px-6 py-5 whitespace-nowrap">
                           <div className="flex flex-col">
                             <span className="text-xs font-black text-slate-800 dark:text-white mb-1 tracking-wide">
@@ -917,6 +985,7 @@ export const ProductsPage = () => {
                         </td>
                         <td className="px-6 py-5 whitespace-nowrap text-right">
                           <div className="flex justify-end items-center space-x-1.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                            {/* Disparador de Ajuste Rápido de Stock */}
                             <button
                               onClick={() =>
                                 setFastStockProduct({
@@ -930,6 +999,8 @@ export const ProductsPage = () => {
                               <ArrowUpCircle size={18} strokeWidth={2.5} />
                             </button>
                             <div className="w-px h-6 bg-slate-200 dark:bg-slate-700 mx-1"></div>
+
+                            {/* Visualizador de Detalles */}
                             <button
                               onClick={() => {
                                 setProductToView({
@@ -942,6 +1013,8 @@ export const ProductsPage = () => {
                             >
                               <Eye size={18} />
                             </button>
+
+                            {/* Disparador de Edición */}
                             <button
                               onClick={() => {
                                 setProductToEdit({
@@ -954,6 +1027,8 @@ export const ProductsPage = () => {
                             >
                               <Edit3 size={18} />
                             </button>
+
+                            {/* Disparador de Borrado */}
                             <button
                               onClick={() => setDeleteConfirm(product.id!)}
                               className="p-2.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-500/10 rounded-xl transition-colors"
@@ -970,6 +1045,7 @@ export const ProductsPage = () => {
             </table>
           </div>
 
+          {/* Controlador de Paginación */}
           <div className="px-8 py-5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-[#050810]/50 flex flex-col sm:flex-row items-center justify-between gap-4">
             <span className="text-xs font-black text-slate-400 uppercase tracking-widest">
               Mostrando{" "}
@@ -1003,6 +1079,7 @@ export const ProductsPage = () => {
         </div>
       </div>
 
+      {/* Montaje de Modales Subordinados */}
       <ProductModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
