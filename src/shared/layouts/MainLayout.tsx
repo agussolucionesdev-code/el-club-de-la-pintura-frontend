@@ -1,3 +1,4 @@
+// Importación de enrutadores y ganchos de navegación de React Router
 import {
   Outlet,
   Navigate,
@@ -5,9 +6,12 @@ import {
   useNavigate,
   useLocation,
 } from "react-router-dom";
+// Importación de gestores de estado locales
 import { useState } from "react";
+// Importación de proveedores de contexto globales (Autenticación y Tema)
 import { useAuth } from "../../core/context/AuthContext";
 import { useTheme } from "../../core/context/ThemeContext";
+// Importación de iconografía vectorizada
 import {
   Sun,
   Moon,
@@ -16,31 +20,49 @@ import {
   Package,
   Power,
   Menu,
+  PackageSearch, // <-- INYECCIÓN: Ícono para auditoría de inventario
 } from "lucide-react";
+// Importación de recursos gráficos estáticos
 import logoImg from "../../assets/images/logo.png";
 
 export const MainLayout = () => {
+  // Extracción de credenciales y métodos de sesión
   const { user, isAuthenticated, logout } = useAuth();
+  // Extracción de estado y alternador de tema visual
   const { theme, toggleTheme } = useTheme();
+
+  // Inicialización de controladores de navegación
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Inicialización de estado para despliegue de menú en dispositivos móviles
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
+  // Ejecución de barrera de seguridad (Redirección si no hay sesión activa)
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
+  // Ejecución de purga de sesión y redirección a login
   const handleLogout = () => {
     logout();
     navigate("/login");
   };
 
+  // Configuración estructural del mapa de navegación principal
   const navLinks = [
     { path: "/", icon: LayoutDashboard, label: "Bóveda Estratégica" },
     { path: "/sales", icon: ShoppingCart, label: "Terminal de Ventas" },
-    { path: "/products", icon: Package, label: "Gestor de Inventario" },
+    { path: "/products", icon: Package, label: "Catálogo Maestro" }, // <-- RENOMBRAMIENTO: Diferenciación de ABM
+    {
+      path: "/inventory",
+      icon: PackageSearch,
+      label: "Auditoría de Inventario",
+    }, // <-- INYECCIÓN: Nueva ruta de stock
   ];
 
+  // Renderizado del árbol DOM (Layout Principal)
   return (
     <div className="flex h-screen bg-slate-50 dark:bg-[#030712] transition-colors duration-500 overflow-hidden font-sans w-full">
+      {/* Renderizado condicional de velo oscuro para menú móvil */}
       {isMobileMenuOpen && (
         <div
           className="fixed inset-0 bg-black/60 backdrop-blur-sm z-30 lg:hidden transition-opacity"
@@ -48,9 +70,11 @@ export const MainLayout = () => {
         />
       )}
 
+      {/* Construcción de Barra Lateral (Sidebar) */}
       <aside
         className={`fixed inset-y-0 left-0 z-40 w-72 bg-[#050810] border-r border-slate-800/80 flex flex-col shadow-[20px_0_40px_-15px_rgba(0,0,0,0.5)] transform ${isMobileMenuOpen ? "translate-x-0" : "-translate-x-full"} lg:relative lg:translate-x-0 transition-transform duration-300 ease-in-out`}
       >
+        {/* Renderizado de Logotipo Empresarial */}
         <div className="h-28 md:h-32 w-full bg-[#000000] flex items-center justify-center relative overflow-hidden group border-b border-brand/20 p-4 shrink-0">
           <div className="absolute inset-0 bg-gradient-to-b from-brand/10 to-transparent opacity-40"></div>
           <img
@@ -60,6 +84,7 @@ export const MainLayout = () => {
           />
         </div>
 
+        {/* Renderizado iterativo de enlaces de navegación */}
         <nav className="flex-1 overflow-y-auto py-6 md:py-8 px-4 md:px-5 space-y-2 md:space-y-3">
           {navLinks.map((item) => {
             const isActive = location.pathname === item.path;
@@ -70,6 +95,7 @@ export const MainLayout = () => {
                 onClick={() => setIsMobileMenuOpen(false)}
                 className={`flex items-center space-x-4 px-4 py-3 md:py-3.5 rounded-2xl transition-all duration-300 group relative overflow-hidden ${isActive ? "bg-brand/10 text-brand border border-brand/20" : "text-slate-400 hover:bg-white/5 hover:text-slate-200"}`}
               >
+                {/* Indicador visual de ruta activa */}
                 {isActive && (
                   <div className="absolute left-0 top-0 bottom-0 w-1 bg-brand rounded-r-full shadow-[0_0_10px_#F59E0B]"></div>
                 )}
@@ -85,6 +111,7 @@ export const MainLayout = () => {
           })}
         </nav>
 
+        {/* Tarjeta de Identidad de Usuario (Footer del Sidebar) */}
         <div className="p-4 md:p-6 border-t border-white/5 bg-[#03050a] min-h-[90px] md:min-h-[100px] flex items-center shrink-0">
           <div className="flex w-full items-center space-x-3 md:space-x-4 bg-[#0a0f1c] p-2.5 md:p-3 rounded-2xl border border-white/5 shadow-sm">
             <div className="relative shrink-0">
@@ -105,9 +132,12 @@ export const MainLayout = () => {
         </div>
       </aside>
 
+      {/* Contenedor de Vista Principal y Cabecera Superior */}
       <div className="flex-1 flex flex-col relative w-full overflow-hidden">
+        {/* Construcción de Cabecera Superior (Top Bar) */}
         <header className="h-20 md:h-24 bg-white/80 dark:bg-[#030712]/80 backdrop-blur-2xl border-b border-slate-200 dark:border-slate-800/50 flex items-center justify-between px-4 md:px-10 transition-colors duration-500 z-10 sticky top-0 shrink-0">
           <div className="flex items-center space-x-3 md:space-x-0">
+            {/* Disparador de menú para dispositivos móviles */}
             <button
               onClick={() => setIsMobileMenuOpen(true)}
               className="lg:hidden p-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300"
@@ -125,6 +155,7 @@ export const MainLayout = () => {
             </div>
           </div>
 
+          {/* Botonera de acciones globales (Tema y Desconexión) */}
           <div className="flex items-center space-x-2 md:space-x-6">
             <button
               onClick={toggleTheme}
@@ -153,6 +184,7 @@ export const MainLayout = () => {
           </div>
         </header>
 
+        {/* Montaje de Vistas Enrutadas (Router Outlet) */}
         <main className="flex-1 overflow-y-auto relative z-0 scroll-smooth w-full">
           <Outlet />
         </main>

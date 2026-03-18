@@ -26,7 +26,7 @@ import { useAuth } from "../../../core/context/AuthContext";
 import { CyberHeader } from "../../../shared/components/CyberHeader";
 import type { Product } from "../../products/components/ProductModal";
 
-// Definición de URL base estable (IPv4)
+// Definición de URL base estable
 const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:4000/api";
 
 // ==========================================
@@ -60,7 +60,7 @@ export const POSPage = () => {
   const token = localStorage.getItem("club_token");
   const userName = user?.name ? user.name.split(" ")[0] : "Cajero";
 
-  // Inicialización de estados con tipos estrictos y valores por defecto (Array vacío)
+  // Inicialización de estados con tipos estrictos y valores por defecto
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [activeRegister, setActiveRegister] = useState<CashRegister | null>(
@@ -83,7 +83,7 @@ export const POSPage = () => {
   const [toast, setToast] = useState<{
     show: boolean;
     msg: string;
-    type: "success" | "error";
+    type: "success" | "error" | "warning";
   }>({
     show: false,
     msg: "",
@@ -101,8 +101,9 @@ export const POSPage = () => {
     { text: "IP ESTABLE: 127.0.0.1", icon: Landmark, delay: "" },
   ];
 
+  // Disparador de notificaciones visuales
   const showToast = useCallback(
-    (msg: string, type: "success" | "error" = "success") => {
+    (msg: string, type: "success" | "error" | "warning" = "success") => {
       setToast({ show: true, msg, type });
       setTimeout(
         () => setToast({ show: false, msg: "", type: "success" }),
@@ -112,7 +113,7 @@ export const POSPage = () => {
     [],
   );
 
-  // EJECUCIÓN DEL BOOTSTRAP: Carga de datos con manejo de errores transaccionales
+  // EJECUCIÓN DEL BOOTSTRAP: Carga de datos con blindaje contra fallos de JSON
   useEffect(() => {
     const bootstrapPOS = async () => {
       if (!token) {
@@ -131,10 +132,10 @@ export const POSPage = () => {
       const currentBranchId = currentUser?.branches?.[0]?.id || 1;
 
       try {
+        // CAPTURA: Petición paralela de recursos críticos
         const [prodRes, custRes, regRes] = await Promise.all([
           fetch(`${API_URL}/products?limit=1000`, { headers }),
           fetch(`${API_URL}/customers`, { headers }),
-          // CORRECCIÓN CRÍTICA: Llamamos al endpoint correcto del backend
           fetch(`${API_URL}/cash-registers/status/${currentBranchId}`, {
             headers,
           }),
@@ -154,66 +155,64 @@ export const POSPage = () => {
           return navigate("/login");
         }
 
-        const productsJson = await prodRes.json();
-        const customersJson = await custRes.json();
+        // PROCESAMIENTO SEGURO: Catálogo de Productos
+        if (prodRes.ok) {
+          const productsJson = await prodRes.json();
+          setProducts(
+            Array.isArray(productsJson.data)
+              ? productsJson.data
+              : Array.isArray(productsJson)
+                ? productsJson
+                : [],
+          );
+        }
 
-        // VALIDACIÓN ESTRUCTURAL
-        setProducts(
-          Array.isArray(productsJson.data)
-            ? productsJson.data
-            : Array.isArray(productsJson)
-              ? productsJson
-              : [],
-        );
-        setCustomers(
-          Array.isArray(customersJson.data)
-            ? customersJson.data
-            : Array.isArray(customersJson)
-              ? customersJson
-              : [],
-        );
+        // PROCESAMIENTO SEGURO: Catálogo de Clientes
+        if (custRes.ok) {
+          const customersJson = await custRes.json();
+          setCustomers(
+            Array.isArray(customersJson.data)
+              ? customersJson.data
+              : Array.isArray(customersJson)
+                ? customersJson
+                : [],
+          );
+        }
 
-        // MANEJO DE CAJA REGISTRADORA
+        // EXTRACCIÓN SEGURA: Estado de Caja Registradora (Evita error 'N' de Not Found)
         if (regRes.ok) {
-          const registerJson = await regRes.json();
+          const registerText = await regRes.text(); // Leemos como texto primero
+          try {
+            const registerJson = JSON.parse(registerText); // Parseamos de forma controlada
 
-          // 1. Extraemos el cuerpo principal de la respuesta
-          let registerData = null;
-          if (registerJson.data) {
-            registerData = Array.isArray(registerJson.data)
-              ? registerJson.data[0]
-              : registerJson.data;
-          } else if (Array.isArray(registerJson)) {
-            registerData = registerJson[0];
-          } else {
-            registerData = registerJson;
-          }
+            let registerData = registerJson.data || registerJson;
+            if (Array.isArray(registerData)) registerData = registerData[0];
 
-          // 2. ADAPTACIÓN AL PAYLOAD DEL ARQUEO:
-          // Buscamos el ID en 'shiftDetails.shiftId' o como 'id' por si a futuro cambia
-          const extractedId =
-            registerData?.shiftDetails?.shiftId || registerData?.id;
+            // ADAPTACIÓN AL PAYLOAD DEL ARQUEO
+            const extractedId =
+              registerData?.shiftDetails?.shiftId || registerData?.id;
 
-          if (extractedId) {
-            // Normalizamos el objeto para que el frontend (y Zod) tengan exactamente lo que necesitan
-            setActiveRegister({
-              id: Number(extractedId),
-              status: "OPEN",
-              expectedBalance:
-                registerData?.cashAudit?.expectedCashInDrawer || 0,
-            });
-          } else {
-            console.warn(
-              "La caja fue recibida pero no tiene un ID válido.",
-              registerData,
-            );
-            showToast(
-              "ATENCIÓN: No se pudo identificar el número de turno/caja.",
-              "error",
-            );
+            if (extractedId) {
+              setActiveRegister({
+                id: Number(extractedId),
+                status: "OPEN",
+                expectedBalance:
+                  registerData?.cashAudit?.expectedCashInDrawer || 0,
+              });
+            } else {
+              showToast(
+                "ATENCIÓN: No se pudo identificar el número de turno/caja.",
+                "warning",
+              );
+            }
+          } catch (parseError) {
+            console.error("Error al parsear datos de caja:", parseError);
           }
         } else {
-          showToast("ATENCIÓN: Debes abrir caja para poder facturar.", "error");
+          showToast(
+            "ATENCIÓN: Debes abrir caja para poder facturar.",
+            "warning",
+          );
         }
       } catch (error) {
         console.error("Fallo crítico en sincronización POS:", error);
@@ -225,7 +224,8 @@ export const POSPage = () => {
     };
     bootstrapPOS();
   }, [token, showToast, navigate, logout, user]);
-  // Manejo de Carrito (Sin cambios de lógica, solo mayor robustez)
+
+  // GESTIÓN DEL CARRITO DE COMPRAS
   const addToCart = (product: Product) => {
     setCart((prev) => {
       const existing = prev.find((item) => item.id === product.id);
@@ -260,6 +260,7 @@ export const POSPage = () => {
     );
   };
 
+  // BUSCADOR REACTIVO Y ESCÁNER EAN
   const handleSearchKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && searchTerm.trim() !== "") {
       const foundProduct = products.find(
@@ -296,9 +297,8 @@ export const POSPage = () => {
     0,
   );
 
-  // FINALIZACIÓN DE VENTA: Sincronización con el Motor de Transacciones
+  // FINALIZACIÓN DE VENTA: Sincronización con el Motor de Transacciones y Zod
   const handleCheckout = async () => {
-    // Validación ESTRICTA antes de empezar
     if (!activeRegister || !activeRegister.id) {
       return showToast(
         "Operación bloqueada: No se pudo identificar la caja abierta.",
@@ -306,17 +306,18 @@ export const POSPage = () => {
       );
     }
 
-    if (cart.length === 0) return showToast("El carrito está vacío.", "error");
+    if (cart.length === 0)
+      return showToast("El carrito está vacío.", "warning");
 
     setIsProcessing(true);
 
     const currentUser = user as ExtendedUser;
 
-    // BLINDAJE DE DATOS
+    // CONFORMACIÓN DE PAYLOAD (BLINDADO)
     const payload = {
       branchId: Number(currentUser?.branches?.[0]?.id || 1),
       userId: Number(user?.id || 1),
-      cashRegisterId: Number(activeRegister.id), // Aquí ya estamos seguros de que existe
+      cashRegisterId: Number(activeRegister.id),
       customerId: selectedCustomerId ? Number(selectedCustomerId) : null,
       totalAmount: Number(totalAmount) > 0 ? Number(totalAmount) : 0.01,
       paymentMethod,
@@ -344,27 +345,25 @@ export const POSPage = () => {
       const result = await response.json();
 
       if (!response.ok) {
-        // INTERCEPTOR DE ERRORES ZOD: Si Zod rechaza, leemos exactamente qué campo falló
+        // INTERCEPTOR DE ERRORES ZOD
         if (result.details) {
-          alert("ERROR DE ZOD:\n" + JSON.stringify(result.details, null, 2));
-
-          // SOLUCIÓN: Reemplazamos 'any' por la interfaz exacta del error
           const camposConError = result.details
             .map((d: { path: string; message: string }) => d.path)
             .join(", ");
-
           throw new Error(`Datos inválidos en: ${camposConError}`);
         }
         throw new Error(result.error || "Fallo transaccional en el servidor");
       }
 
-      showToast("¡Venta procesada, stock actualizado y dinero en caja!");
+      showToast(
+        "¡Venta procesada, stock actualizado y dinero en caja!",
+        "success",
+      );
       setCart([]);
       setSelectedCustomerId(null);
     } catch (error: unknown) {
       const errorMsg =
         error instanceof Error ? error.message : "Error desconocido";
-      // Mostramos el error exacto en el cartelito
       showToast(`Aduana: ${errorMsg}`, "error");
     } finally {
       setIsProcessing(false);
@@ -372,16 +371,19 @@ export const POSPage = () => {
     }
   };
 
+  // ==========================================
+  // RENDERIZADO DEL ÁRBOL DOM (VISTA)
+  // ==========================================
   return (
     <div className="relative min-h-screen bg-[#F4F7F9] dark:bg-[#030712] p-4 flex flex-col transition-colors duration-700">
       <div className="absolute top-0 right-0 w-[40rem] h-[40rem] bg-brand/5 rounded-full blur-[120px] pointer-events-none"></div>
 
-      {/* RENDERIZADO DE NOTIFICACIONES */}
+      {/* CENTRO DE NOTIFICACIONES */}
       <div
         className={`fixed top-6 right-6 z-[200] transition-all duration-500 ${toast.show ? "translate-y-0 opacity-100" : "-translate-y-10 opacity-0 pointer-events-none"}`}
       >
         <div
-          className={`flex items-center space-x-3 px-6 py-4 rounded-2xl shadow-2xl border backdrop-blur-md ${toast.type === "success" ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400" : "bg-red-500/10 border-red-500/20 text-red-400"}`}
+          className={`flex items-center space-x-3 px-6 py-4 rounded-2xl shadow-2xl border backdrop-blur-md ${toast.type === "success" ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400" : toast.type === "warning" ? "bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400" : "bg-red-500/10 border-red-500/20 text-red-600 dark:text-red-400"}`}
         >
           {toast.type === "success" ? (
             <CheckCircle size={20} />
@@ -393,6 +395,7 @@ export const POSPage = () => {
       </div>
 
       <div className="relative z-10 max-w-[1700px] mx-auto w-full flex-1 flex flex-col space-y-4">
+        {/* CABECERA CYBER */}
         <CyberHeader
           phrases={phrases}
           labelIcon={ShoppingCart}
@@ -449,13 +452,13 @@ export const POSPage = () => {
                           </h3>
                         </div>
                         <div className="flex items-end justify-between">
-                          <span className="text-xl font-black text-emerald-500">
-                            $
+                          <span className="text-xl font-black text-emerald-600 dark:text-emerald-400">
+                            ${" "}
                             {Number(
                               p.retailPrice || p.price || 0,
                             ).toLocaleString("es-AR")}
                           </span>
-                          <div className="w-10 h-10 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center group-hover:bg-brand group-hover:text-white transition-colors">
+                          <div className="w-10 h-10 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center group-hover:bg-brand group-hover:text-white transition-colors text-slate-400 dark:text-slate-500">
                             <Plus size={20} strokeWidth={3} />
                           </div>
                         </div>
@@ -474,7 +477,7 @@ export const POSPage = () => {
                 <div className="flex space-x-2">
                   <button
                     onClick={() => setPosPage((p) => Math.max(1, p - 1))}
-                    className="p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:text-brand transition-colors"
+                    className="p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:text-brand transition-colors text-slate-400"
                   >
                     <ChevronLeft size={20} />
                   </button>
@@ -485,7 +488,7 @@ export const POSPage = () => {
                     onClick={() =>
                       setPosPage((p) => Math.min(totalPosPages, p + 1))
                     }
-                    className="p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:text-brand transition-colors"
+                    className="p-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl hover:text-brand transition-colors text-slate-400"
                   >
                     <ChevronRight size={20} />
                   </button>
@@ -502,7 +505,7 @@ export const POSPage = () => {
                 Actual
               </h2>
               {activeRegister && (
-                <div className="flex items-center text-[10px] font-bold text-emerald-500 bg-emerald-500/10 px-3 py-1 rounded-full uppercase">
+                <div className="flex items-center text-[10px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-100 dark:border-emerald-500/20 px-3 py-1 rounded-full uppercase">
                   Caja ID: {activeRegister.id}
                 </div>
               )}
@@ -537,7 +540,7 @@ export const POSPage = () => {
             {/* LISTADO DEL CARRITO */}
             <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-3">
               {cart.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center text-slate-300 opacity-40">
+                <div className="h-full flex flex-col items-center justify-center text-slate-300 dark:text-slate-700 opacity-60">
                   <ScanLine size={80} className="mb-4 animate-pulse" />
                   <p className="font-black uppercase tracking-widest text-sm">
                     Esperando ítems...
@@ -550,19 +553,19 @@ export const POSPage = () => {
                     className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl p-4 shadow-sm group"
                   >
                     <div className="flex justify-between items-start mb-2">
-                      <span className="text-xs font-black text-slate-800 dark:text-white leading-tight">
+                      <span className="text-xs font-black text-slate-800 dark:text-white leading-tight pr-4">
                         {item.name}
                       </span>
                       <button
                         onClick={() => removeFromCart(item.id!)}
-                        className="text-slate-300 hover:text-red-500 transition-colors"
+                        className="text-slate-300 hover:text-red-500 transition-colors shrink-0"
                       >
                         <Trash2 size={16} />
                       </button>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-black text-emerald-500">
-                        $
+                    <div className="flex items-center justify-between mt-3">
+                      <span className="text-sm font-black text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 px-2 py-1 rounded-lg">
+                        ${" "}
                         {Number(
                           item.retailPrice || item.price || 0,
                         ).toLocaleString("es-AR")}
@@ -574,7 +577,7 @@ export const POSPage = () => {
                         >
                           <Minus size={14} strokeWidth={3} />
                         </button>
-                        <span className="text-xs font-black w-5 text-center dark:text-white">
+                        <span className="text-xs font-black w-5 text-center text-slate-800 dark:text-white">
                           {item.cartQuantity}
                         </span>
                         <button
