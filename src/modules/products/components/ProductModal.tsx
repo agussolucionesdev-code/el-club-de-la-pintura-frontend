@@ -54,7 +54,6 @@ interface ProductModalProps {
 
 // Extracción de variables de entorno para conexión a API
 const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:4000/api";
-
 export const ProductModal = ({
   isOpen,
   onClose,
