@@ -1,6 +1,4 @@
-// Importación de dependencias estructurales y hooks de optimización de React
 import { useState, useEffect, useCallback } from "react";
-// Importación de iconografía vectorizada
 import {
   PackageSearch,
   Search,
@@ -18,10 +16,12 @@ import {
   Layers,
   Globe,
 } from "lucide-react";
-// Importación de componentes especializados y lógica de negocio
+
 import { CyberHeader } from "../../../shared/components/CyberHeader";
 import { useAuth } from "../../../core/context/AuthContext";
 import { StockAdjustModal } from "../components/StockAdjustModal";
+// MOTOR NEURO-VOCAL GLOBAL (Interceptor)
+import { neuroToast } from "../../../shared/utils/neuroToast";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:4000/api";
 
@@ -33,7 +33,6 @@ interface ProductDetails {
   retailPrice: number;
   imageUrl?: string;
 }
-
 interface StockItem {
   id: number;
   quantity: number;
@@ -42,7 +41,6 @@ interface StockItem {
   branchId: number;
   product: ProductDetails;
 }
-
 interface ExtendedUser {
   id: number;
   name: string;
@@ -56,51 +54,23 @@ export const InventoryPage = () => {
   const currentUser = user as ExtendedUser;
   const token = localStorage.getItem("club_token");
 
-  // ESTADOS ARQUITECTÓNICOS (El valor 0 representa "Todas las Sucursales")
   const [activeBranchId, setActiveBranchId] = useState<number>(0);
   const [inventory, setInventory] = useState<StockItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // ESTADOS DE FILTRADO Y BÚSQUEDA AVANZADA
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<
     "ALL" | "OPTIMAL" | "CRITICAL" | "OUT"
   >("ALL");
   const [categoryFilter, setCategoryFilter] = useState<string>("ALL");
 
-  // ESTADOS DE PAGINACIÓN DINÁMICA
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-
   const [selectedStock, setSelectedStock] = useState<StockItem | null>(null);
-  const [toast, setToast] = useState<{
-    show: boolean;
-    msg: string;
-    type: "success" | "error";
-  }>({
-    show: false,
-    msg: "",
-    type: "success",
-  });
-
-  const showToast = useCallback(
-    (msg: string, type: "success" | "error" = "success") => {
-      setToast({ show: false, msg: "", type: "success" });
-      setTimeout(() => {
-        setToast({ show: true, msg, type });
-        setTimeout(
-          () => setToast({ show: false, msg: "", type: "success" }),
-          4500,
-        );
-      }, 10);
-    },
-    [],
-  );
 
   const fetchInventory = useCallback(async () => {
     setIsLoading(true);
     try {
-      // Enviamos el ID de la sucursal (0 para traer el consolidado de todas)
       const response = await fetch(`${API_URL}/stock/${activeBranchId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -109,28 +79,24 @@ export const InventoryPage = () => {
         setInventory(result.data || []);
       }
     } catch (error) {
-      console.error("Fallo en sincronización de inventario:", error);
-      showToast("Error de conexión con el almacén central.", "error");
+      console.log(error);
+      neuroToast("Error al sincronizar inventario.", "error");
     } finally {
       setIsLoading(false);
     }
-  }, [token, activeBranchId, showToast]);
+  }, [token, activeBranchId]);
 
   useEffect(() => {
     fetchInventory();
   }, [fetchInventory]);
-
-  // RESET DE PAGINACIÓN
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, statusFilter, categoryFilter, activeBranchId]);
 
-  // Extracción dinámica de categorías únicas para el filtro
   const uniqueCategories = Array.from(
     new Set(inventory.map((item) => item.product.category)),
   ).filter(Boolean);
 
-  // MOTOR DE FILTRADO COMBINADO
   const filteredInventory = inventory.filter((item) => {
     const s = searchTerm.toLowerCase();
     const matchesSearch =
@@ -151,7 +117,6 @@ export const InventoryPage = () => {
     return matchesSearch && matchesStatus && matchesCategory;
   });
 
-  // MOTOR DE PAGINACIÓN
   const totalPages = Math.max(
     1,
     Math.ceil(filteredInventory.length / itemsPerPage),
@@ -161,7 +126,6 @@ export const InventoryPage = () => {
     currentPage * itemsPerPage,
   );
 
-  // KPIs Estratégicos Globales
   const totalProducts = inventory.length;
   const categoriesCount = new Set(inventory.map((i) => i.product.category))
     .size;
@@ -174,25 +138,7 @@ export const InventoryPage = () => {
   ).length;
 
   return (
-    <div className="min-h-screen bg-[#F4F7F9] dark:bg-[#030712] p-4 flex flex-col transition-colors duration-700">
-      {/* Centro de Notificaciones */}
-      <div
-        className={`fixed top-6 right-6 z-[999] transition-all duration-500 transform ${toast.show ? "translate-y-0 opacity-100" : "-translate-y-10 opacity-0 pointer-events-none"}`}
-      >
-        <div
-          className={`flex items-center space-x-3 px-6 py-4 rounded-3xl shadow-[0_20px_50px_rgba(0,0,0,0.3)] border backdrop-blur-xl ${toast.type === "success" ? "bg-emerald-50/90 dark:bg-emerald-950/90 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400" : "bg-red-50/90 dark:bg-red-950/90 border-red-200 dark:border-red-800 text-red-700 dark:text-red-400"}`}
-        >
-          {toast.type === "success" ? (
-            <CheckCircle size={22} className="text-emerald-500" />
-          ) : (
-            <AlertTriangle size={22} className="text-red-500" />
-          )}
-          <span className="font-extrabold text-sm tracking-tight">
-            {toast.msg}
-          </span>
-        </div>
-      </div>
-
+    <div className="min-h-screen bg-[#F8FAFC] dark:bg-[#030712] p-4 flex flex-col transition-colors duration-700">
       <div className="max-w-[1700px] mx-auto w-full flex-1 flex flex-col space-y-6">
         <CyberHeader
           phrases={[
@@ -231,9 +177,8 @@ export const InventoryPage = () => {
           ]}
         />
 
-        {/* BARRA DE HERRAMIENTAS COMPLETAS */}
-        <div className="flex flex-col xl:flex-row items-center gap-3 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-3xl p-2 shadow-lg">
-          {/* Búsqueda */}
+        {/* BARRA DE FILTROS SUPERIOR */}
+        <div className="flex flex-col xl:flex-row items-center gap-3 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border border-slate-200 dark:border-slate-800 rounded-3xl p-2 shadow-sm">
           <div className="relative flex-1 w-full">
             <Search
               className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400"
@@ -247,10 +192,8 @@ export const InventoryPage = () => {
               className="w-full bg-transparent pl-14 pr-4 py-4 font-bold text-slate-700 dark:text-white placeholder-slate-400 focus:outline-none"
             />
           </div>
-
           <div className="h-10 w-px bg-slate-200 dark:bg-slate-800 hidden xl:block"></div>
 
-          {/* Filtro por Categoría */}
           <div className="relative shrink-0 w-full xl:w-48">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
               <Layers size={18} />
@@ -280,10 +223,8 @@ export const InventoryPage = () => {
               <ChevronDown size={16} />
             </div>
           </div>
-
           <div className="h-10 w-px bg-slate-200 dark:bg-slate-800 hidden xl:block"></div>
 
-          {/* Filtro por Estado de Alerta (Corregido el tipado) */}
           <div className="relative shrink-0 w-full xl:w-56">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
               <Filter size={18} />
@@ -313,7 +254,7 @@ export const InventoryPage = () => {
                 value="CRITICAL"
                 className="bg-white dark:bg-slate-800 text-slate-800 dark:text-white"
               >
-                Para Reponer (Crítico)
+                Para Reponer
               </option>
               <option
                 value="OPTIMAL"
@@ -326,10 +267,8 @@ export const InventoryPage = () => {
               <ChevronDown size={16} />
             </div>
           </div>
-
           <div className="h-10 w-px bg-slate-200 dark:bg-slate-800 hidden xl:block"></div>
 
-          {/* Selector de Sucursal */}
           <div className="relative shrink-0 w-full xl:w-64">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-brand">
               {activeBranchId === 0 ? <Globe size={18} /> : <Store size={18} />}
@@ -361,8 +300,8 @@ export const InventoryPage = () => {
           </div>
         </div>
 
-        {/* Bóveda de Inventario (Tabla Paginada) */}
-        <div className="bg-white dark:bg-[#0a0f1c] border border-slate-200 dark:border-slate-800 rounded-[2.5rem] shadow-2xl overflow-hidden flex-1 flex flex-col transition-all duration-300">
+        {/* TABLA PRINCIPAL */}
+        <div className="bg-white dark:bg-[#0a0f1c] border border-slate-200 dark:border-slate-800 rounded-[2.5rem] shadow-xl overflow-hidden flex-1 flex flex-col transition-all duration-300">
           <div className="overflow-x-auto custom-scrollbar flex-1">
             <table className="w-full text-left border-collapse">
               <thead>
@@ -390,7 +329,7 @@ export const InventoryPage = () => {
                       colSpan={5}
                       className="p-10 text-center text-slate-400 font-bold uppercase tracking-widest text-xs"
                     >
-                      No se detectaron registros para estos filtros.
+                      No hay registros.
                     </td>
                   </tr>
                 ) : (
@@ -405,12 +344,12 @@ export const InventoryPage = () => {
                         className="hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-colors group"
                       >
                         <td className="p-6 flex items-center space-x-4">
-                          <div className="w-12 h-12 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex items-center justify-center overflow-hidden flex-shrink-0 shadow-inner group-hover:scale-110 transition-transform">
+                          <div className="w-12 h-12 rounded-2xl border border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex items-center justify-center overflow-hidden flex-shrink-0 shadow-inner">
                             {item.product.imageUrl ? (
                               <img
                                 src={item.product.imageUrl}
                                 alt={item.product.name}
-                                className="w-full h-full object-cover"
+                                className="w-full h-full object-contain rounded-lg p-1"
                               />
                             ) : (
                               <Package
@@ -429,29 +368,28 @@ export const InventoryPage = () => {
                           </div>
                         </td>
                         <td className="p-6">
-                          <p className="text-[11px] text-slate-500 dark:text-slate-400 font-black uppercase tracking-wider bg-slate-50 dark:bg-slate-900 px-3 py-1.5 rounded-lg inline-block shadow-inner border border-slate-100 dark:border-slate-800/50">
+                          <p className="text-[11px] text-slate-500 dark:text-slate-400 font-black uppercase tracking-wider bg-slate-50 dark:bg-slate-900 px-3 py-1.5 rounded-lg inline-block border border-slate-100 dark:border-slate-800/50">
                             {item.product.sku}
                           </p>
                         </td>
                         <td className="p-6 text-right">
                           <span
-                            className={`text-3xl font-black transition-colors ${isOutOfStock ? "text-red-500" : isCritical ? "text-amber-500" : "text-emerald-500"}`}
+                            className={`text-3xl font-black ${isOutOfStock ? "text-red-500" : isCritical ? "text-amber-500" : "text-emerald-500"}`}
                           >
                             {item.quantity}
                           </span>
                         </td>
                         <td className="p-6 text-center">
                           {isOutOfStock ? (
-                            <div className="inline-flex items-center space-x-1.5 text-red-500 bg-red-500/10 px-4 py-2 rounded-xl text-[10px] font-black uppercase shadow-lg shadow-red-500/5">
+                            <div className="inline-flex items-center space-x-1.5 text-red-500 bg-red-500/10 px-4 py-2 rounded-xl text-[10px] font-black uppercase">
                               <XCircle size={15} /> <span>Agotado</span>
                             </div>
                           ) : isCritical ? (
-                            <div className="inline-flex items-center space-x-1.5 text-amber-500 bg-amber-500/10 px-4 py-2 rounded-xl text-[10px] font-black uppercase shadow-lg shadow-amber-500/5">
-                              <AlertTriangle size={15} />{" "}
-                              <span>Crítico (Min: {item.minStock})</span>
+                            <div className="inline-flex items-center space-x-1.5 text-amber-500 bg-amber-500/10 px-4 py-2 rounded-xl text-[10px] font-black uppercase">
+                              <AlertTriangle size={15} /> <span>Crítico</span>
                             </div>
                           ) : (
-                            <div className="inline-flex items-center space-x-1.5 text-emerald-500 bg-emerald-500/10 px-4 py-2 rounded-xl text-[10px] font-black uppercase shadow-lg shadow-emerald-500/5">
+                            <div className="inline-flex items-center space-x-1.5 text-emerald-500 bg-emerald-500/10 px-4 py-2 rounded-xl text-[10px] font-black uppercase">
                               <CheckCircle size={15} /> <span>Normal</span>
                             </div>
                           )}
@@ -473,39 +411,24 @@ export const InventoryPage = () => {
             </table>
           </div>
 
-          {/* CONTROLES DE PAGINACIÓN */}
           {!isLoading && filteredInventory.length > 0 && (
             <div className="p-4 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/30 flex items-center justify-between">
               <p className="text-xs font-bold text-slate-500 dark:text-slate-400">
-                Mostrando{" "}
-                <span className="text-slate-800 dark:text-white font-black">
-                  {(currentPage - 1) * itemsPerPage + 1}
-                </span>{" "}
-                a{" "}
-                <span className="text-slate-800 dark:text-white font-black">
-                  {Math.min(
-                    currentPage * itemsPerPage,
-                    filteredInventory.length,
-                  )}
-                </span>{" "}
-                de{" "}
-                <span className="text-brand font-black">
-                  {filteredInventory.length}
-                </span>{" "}
-                registros
+                Mostrando {(currentPage - 1) * itemsPerPage + 1} a{" "}
+                {Math.min(currentPage * itemsPerPage, filteredInventory.length)}{" "}
+                de {filteredInventory.length} registros
               </p>
-
               <div className="flex items-center space-x-2">
                 <button
                   onClick={() =>
                     setCurrentPage((prev) => Math.max(prev - 1, 1))
                   }
                   disabled={currentPage === 1}
-                  className={`p-2 rounded-xl border transition-all ${currentPage === 1 ? "border-slate-200 dark:border-slate-800 text-slate-300 dark:text-slate-600 cursor-not-allowed" : "border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 hover:text-brand hover:border-brand"}`}
+                  className="p-2 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 disabled:opacity-50"
                 >
                   <ChevronLeft size={20} />
                 </button>
-                <div className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-black text-slate-700 dark:text-white shadow-sm">
+                <div className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-black text-slate-700 dark:text-white">
                   Página {currentPage} de {totalPages}
                 </div>
                 <button
@@ -513,7 +436,7 @@ export const InventoryPage = () => {
                     setCurrentPage((prev) => Math.min(prev + 1, totalPages))
                   }
                   disabled={currentPage === totalPages}
-                  className={`p-2 rounded-xl border transition-all ${currentPage === totalPages ? "border-slate-200 dark:border-slate-800 text-slate-300 dark:text-slate-600 cursor-not-allowed" : "border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 hover:bg-white dark:hover:bg-slate-800 hover:text-brand hover:border-brand"}`}
+                  className="p-2 rounded-xl border border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300 disabled:opacity-50"
                 >
                   <ChevronRight size={20} />
                 </button>
@@ -523,6 +446,7 @@ export const InventoryPage = () => {
         </div>
       </div>
 
+      {/* LLAMADA AL MODAL CON LA SOLUCIÓN DEL INTERCEPTOR */}
       <StockAdjustModal
         isOpen={!!selectedStock}
         onClose={() => setSelectedStock(null)}
@@ -535,15 +459,18 @@ export const InventoryPage = () => {
                 product: {
                   name: selectedStock.product.name,
                   sku: selectedStock.product.sku,
+                  category: selectedStock.product.category,
+                  imageUrl: selectedStock.product.imageUrl,
                 },
               }
             : null
         }
         onSuccess={(msg) => {
-          showToast(msg, "success");
+          neuroToast(msg, "success");
           fetchInventory();
         }}
-        onError={(msg) => showToast(msg, "error")}
+        // SOLUCIÓN: Pasamos el 'msg' directo para que el interceptor lea la palabra "caja"
+        onError={(msg) => neuroToast(msg, "error")}
         token={token}
       />
     </div>
