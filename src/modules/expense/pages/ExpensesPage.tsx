@@ -11,10 +11,11 @@ import { CyberHeader } from "../../../shared/components/CyberHeader";
 import { neuroToast } from "../../../shared/utils/neuroToast";
 import { ExpenseModal } from "../components/ExpenseModal";
 import { useAuth } from "../../../core/context/AuthContext";
+// 🛡️ IMPORTAMOS EL CEREBRO GLOBAL DE LA CAJA
+import { useCashRegister } from "../../../core/context/CashRegisterContext";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:4000/api";
 
-// 🛡️ CORRECCIÓN 1: Cambiamos 'description' por 'reason'
 export interface ExpenseItem {
   id: number;
   amount: number;
@@ -38,38 +39,16 @@ export const ExpensesPage = () => {
   const token = localStorage.getItem("club_token");
   const { user } = useAuth();
 
+  // 🛡️ NOS CONECTAMOS A LA CAJA GLOBAL EN TIEMPO REAL
+  const { activeRegister, isLoadingRegister } = useCashRegister();
+
   const currentUser = user as ExtendedUser | null;
   const currentBranchId = currentUser?.branches?.[0]?.id || 1;
 
   const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-
-  const [activeCashRegisterId, setActiveCashRegisterId] = useState<
-    number | null
-  >(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-
-  const checkRegisterStatus = useCallback(async () => {
-    if (!token) return;
-    try {
-      const res = await fetch(
-        `${API_URL}/cash-registers/${currentBranchId}/active`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
-      if (res.ok) {
-        const json = await res.json();
-        setActiveCashRegisterId(
-          json.data && json.data.id ? Number(json.data.id) : null,
-        );
-      }
-    } catch (e) {
-      console.log(e);
-      console.log("Error al verificar caja");
-    }
-  }, [currentBranchId, token]);
 
   const fetchExpenses = useCallback(async () => {
     setIsLoading(true);
@@ -90,11 +69,10 @@ export const ExpensesPage = () => {
   }, [token]);
 
   useEffect(() => {
-    checkRegisterStatus();
     fetchExpenses();
-  }, [checkRegisterStatus, fetchExpenses]);
+  }, [fetchExpenses]);
 
-  // 🛡️ CORRECCIÓN 2: Buscamos por 'reason' con protección por si viene vacío
+  // 🛡️ Buscamos por 'reason' con protección por si viene vacío
   const filteredExpenses = expenses.filter(
     (e) =>
       (e.reason && e.reason.toLowerCase().includes(searchTerm.toLowerCase())) ||
@@ -150,20 +128,27 @@ export const ExpensesPage = () => {
 
           <button
             onClick={() =>
-              activeCashRegisterId
+              activeRegister
                 ? setIsModalOpen(true)
                 : neuroToast("Debe abrir la caja primero", "error")
             }
+            disabled={isLoadingRegister}
             className={`w-full md:w-auto px-8 py-4 rounded-2xl font-black text-sm uppercase flex items-center justify-center space-x-2 transition-all 
-              ${activeCashRegisterId ? "bg-rose-600 hover:bg-rose-700 text-white shadow-lg shadow-rose-600/30 hover:scale-[1.02]" : "bg-slate-200 dark:bg-slate-800 text-slate-500 cursor-not-allowed"}`}
+              ${isLoadingRegister ? "bg-slate-200 dark:bg-slate-800 text-slate-500 cursor-wait" : activeRegister ? "bg-rose-600 hover:bg-rose-700 text-white shadow-lg shadow-rose-600/30 hover:scale-[1.02]" : "bg-slate-200 dark:bg-slate-800 text-slate-500 cursor-not-allowed"}`}
           >
-            {activeCashRegisterId ? (
+            {isLoadingRegister ? (
+              <Loader2 className="animate-spin" size={20} />
+            ) : activeRegister ? (
               <Plus size={20} />
             ) : (
               <LockKeyhole size={20} />
             )}
             <span>
-              {activeCashRegisterId ? "Registrar Egreso" : "Caja Cerrada"}
+              {isLoadingRegister
+                ? "Sincronizando Caja..."
+                : activeRegister
+                  ? "Registrar Egreso"
+                  : "Caja Cerrada"}
             </span>
           </button>
         </div>
@@ -219,7 +204,6 @@ export const ExpensesPage = () => {
                         </p>
                       </td>
                       <td className="p-6">
-                        {/* 🛡️ CORRECCIÓN 3: Imprimimos 'reason' en lugar de 'description' */}
                         <p className="text-sm font-bold text-slate-700 dark:text-slate-200">
                           {exp.reason || "Sin detalle"}
                         </p>
@@ -253,7 +237,7 @@ export const ExpensesPage = () => {
         onClose={() => setIsModalOpen(false)}
         onSuccess={fetchExpenses}
         token={token}
-        activeCashRegisterId={activeCashRegisterId}
+        activeCashRegisterId={activeRegister?.id || null} // 🛡️ AHORA SÍ RECIBE EL ID CORRECTO
         branchId={currentBranchId}
       />
     </div>

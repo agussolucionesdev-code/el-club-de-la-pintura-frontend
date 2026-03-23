@@ -23,9 +23,9 @@ import {
   User as UserIcon,
   Search,
   PackageOpen,
-  HandCoins, // 🛡️ NUEVO ÍCONO PARA CUENTA CORRIENTE
-  ShieldAlert, // 🛡️ NUEVO ÍCONO DE ALERTA
-  PenTool, // 🛡️ NUEVO ÍCONO PARA QUIÉN RETIRA
+  HandCoins,
+  ShieldAlert,
+  PenTool,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -55,7 +55,6 @@ interface ExtendedUser {
 
 const speakAlert = (text: string) => {
   if (localStorage.getItem("muted_alerts") === "true") return;
-
   if ("speechSynthesis" in window) {
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
@@ -85,8 +84,6 @@ export const POSPage = () => {
     null,
   );
   const [paymentMethod, setPaymentMethod] = useState("CASH");
-
-  // 🛡️ NUEVO ESTADO: Quién se lleva la mercadería fiada
   const [pickedUpBy, setPickedUpBy] = useState("");
 
   const [isProcessing, setIsProcessing] = useState(false);
@@ -121,11 +118,9 @@ export const POSPage = () => {
       const formattedMsg = (
         <span className="text-lg font-black tracking-tight">{msg}</span>
       );
-
       if (type === "success") toast.success(formattedMsg);
       else if (type === "error") toast.error(formattedMsg);
       else toast(formattedMsg, { icon: "⚠️" });
-
       speakAlert(speakMsg || msg);
     },
     [],
@@ -137,10 +132,7 @@ export const POSPage = () => {
       const timestamp = new Date().getTime();
       const res = await fetch(
         `${API_URL}/cash-registers/${currentBranchId}/active?_t=${timestamp}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          cache: "no-store",
-        },
+        { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" },
       );
       if (res.ok) {
         const json = await res.json();
@@ -307,7 +299,6 @@ export const POSPage = () => {
     0,
   );
 
-  // 🛡️ LÓGICA POKA-YOKE (A prueba de errores para Cuentas Corrientes)
   const isCreditAccount = paymentMethod === "CREDIT_ACCOUNT";
   const isMissingCreditInfo =
     isCreditAccount && (!selectedCustomerId || pickedUpBy.trim().length < 3);
@@ -344,7 +335,7 @@ export const POSPage = () => {
       customerId: selectedCustomerId ? Number(selectedCustomerId) : null,
       totalAmount: Number(totalAmount) > 0 ? Number(totalAmount) : 0.01,
       paymentMethod,
-      pickedUpBy: isCreditAccount ? pickedUpBy.trim() : undefined, // 🛡️ INYECTAMOS AL AUTORIZADO
+      pickedUpBy: isCreditAccount ? pickedUpBy.trim() : undefined,
       status: isCreditAccount ? "PENDING" : "PAID",
       items: cart.map((item) => ({
         productId: Number(item.id),
@@ -369,7 +360,7 @@ export const POSPage = () => {
       const result = await response.json();
 
       if (!response.ok) {
-        if (result.details) throw new Error("Datos inválidos en el ticket.");
+        console.error("Detalle de validación Backend:", result);
         throw new Error(result.error || "Fallo transaccional.");
       }
 
@@ -380,10 +371,11 @@ export const POSPage = () => {
           ? "Deuda registrada."
           : "Venta registrada correctamente.",
       );
+
       setCart([]);
       setSelectedCustomerId(null);
-      setPickedUpBy(""); // Limpiamos el campo
-      setPaymentMethod("CASH"); // Volvemos a efectivo por defecto
+      setPickedUpBy("");
+      setPaymentMethod("CASH");
       checkRegisterStatus();
     } catch (error: unknown) {
       console.log(error);
@@ -551,8 +543,7 @@ export const POSPage = () => {
                     )
                   }
                   className={`w-full pl-12 pr-4 py-3.5 bg-white dark:bg-slate-800 border rounded-2xl text-sm font-black text-slate-700 dark:text-white appearance-none focus:outline-none focus:ring-2 focus:ring-brand/50 cursor-pointer shadow-sm transition-all
-                    ${isCreditAccount && !selectedCustomerId ? "border-red-400 focus:ring-red-500/50" : "border-slate-200 dark:border-slate-700"}
-                  `}
+                    ${isCreditAccount && !selectedCustomerId ? "border-red-400 focus:ring-red-500/50" : "border-slate-200 dark:border-slate-700"}`}
                 >
                   <option value="">CONSUMIDOR FINAL</option>
                   {Array.isArray(customers) &&
@@ -569,7 +560,6 @@ export const POSPage = () => {
                 )}
               </div>
 
-              {/* Input mágico para Cuenta Corriente */}
               <AnimatePresence>
                 {isCreditAccount && (
                   <motion.div
@@ -587,8 +577,7 @@ export const POSPage = () => {
                       value={pickedUpBy}
                       onChange={(e) => setPickedUpBy(e.target.value)}
                       className={`w-full pl-12 pr-4 py-3.5 bg-amber-50 dark:bg-amber-900/10 border rounded-2xl text-sm font-black text-amber-900 dark:text-amber-100 placeholder-amber-400/70 focus:outline-none transition-all
-                        ${isCreditAccount && pickedUpBy.trim().length < 3 ? "border-red-400" : "border-amber-200 dark:border-amber-800/50"}
-                      `}
+                        ${isCreditAccount && pickedUpBy.trim().length < 3 ? "border-red-400" : "border-amber-200 dark:border-amber-800/50"}`}
                     />
                   </motion.div>
                 )}
@@ -666,26 +655,19 @@ export const POSPage = () => {
 
             {/* SECCIÓN DE COBRO */}
             <div className="p-6 bg-slate-50 dark:bg-slate-900/80 border-t border-slate-200 dark:border-slate-800 shrink-0">
-              {/* 🛡️ NUEVA GRILLA DE 5 MÉTODOS DE PAGO */}
               <div className="grid grid-cols-5 gap-2 mb-6">
                 {[
                   { id: "CASH", icon: Banknote, label: "Efectivo" },
                   { id: "DEBIT", icon: CreditCard, label: "Débito" },
                   { id: "CREDIT", icon: Landmark, label: "Crédito" },
                   { id: "TRANSFER", icon: Smartphone, label: "Transf." },
-                  { id: "CREDIT_ACCOUNT", icon: HandCoins, label: "Cta. Cte." }, // EL QUINTO ELEMENTO
+                  { id: "CREDIT_ACCOUNT", icon: HandCoins, label: "Cta. Cte." },
                 ].map((m) => (
                   <button
                     key={m.id}
                     onClick={() => setPaymentMethod(m.id)}
                     className={`flex flex-col items-center justify-center py-3 rounded-2xl border-2 transition-all 
-                      ${
-                        paymentMethod === m.id && m.id === "CREDIT_ACCOUNT"
-                          ? "bg-amber-500/10 border-amber-500 text-amber-600 shadow-sm"
-                          : paymentMethod === m.id
-                            ? "bg-brand/10 border-brand text-brand shadow-sm"
-                            : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:border-brand/40"
-                      }`}
+                      ${paymentMethod === m.id && m.id === "CREDIT_ACCOUNT" ? "bg-amber-500/10 border-amber-500 text-amber-600 shadow-sm" : paymentMethod === m.id ? "bg-brand/10 border-brand text-brand shadow-sm" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:border-brand/40"}`}
                   >
                     <m.icon size={20} className="mb-1" />
                     <span className="text-[8px] font-black uppercase tracking-tighter truncate w-full text-center px-1">
@@ -715,13 +697,7 @@ export const POSPage = () => {
                 onClick={handleCheckout}
                 disabled={!isReadyToPay}
                 className={`w-full py-5 rounded-2xl flex items-center justify-center space-x-3 text-lg font-black transition-all duration-300 
-                  ${
-                    isReadyToPay && isCreditAccount
-                      ? "bg-amber-500 hover:bg-amber-600 text-white shadow-xl shadow-amber-500/30 hover:scale-[1.02]"
-                      : isReadyToPay
-                        ? "bg-emerald-500 hover:bg-emerald-600 text-white shadow-xl shadow-emerald-500/30 hover:scale-[1.02]"
-                        : "bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed"
-                  }`}
+                  ${isReadyToPay && isCreditAccount ? "bg-amber-500 hover:bg-amber-600 text-white shadow-xl shadow-amber-500/30 hover:scale-[1.02]" : isReadyToPay ? "bg-emerald-500 hover:bg-emerald-600 text-white shadow-xl shadow-emerald-500/30 hover:scale-[1.02]" : "bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed"}`}
               >
                 {isProcessing ? (
                   <Loader2 size={24} className="animate-spin" />

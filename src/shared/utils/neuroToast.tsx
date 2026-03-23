@@ -17,7 +17,7 @@ export const speakAlert = (text: string) => {
   }
 };
 
-// Filtro de Seguridad: Evita que la voz lea código HTML, JSON o errores gigantes
+// 🛡️ Filtro de Seguridad y Limpieza Fonética (Traducción de $ ARS a Pesos)
 const sanitizeForVoice = (msg: string, defaultVoice: string) => {
   if (!msg) return defaultVoice;
 
@@ -26,10 +26,22 @@ const sanitizeForVoice = (msg: string, defaultVoice: string) => {
     msg.includes("<html>") ||
     msg.includes("object") ||
     msg.includes("function");
+
   if (hasCode || msg.length > 120) {
     return defaultVoice; // Usa un texto limpio en lugar del código
   }
-  return msg;
+
+  // 🧠 LIMPIEZA FONÉTICA DE MONEDA
+  // 🛡️ CORRECCIÓN: Usamos 'const' porque el valor no se reasigna
+  const cleanMsg = msg
+    // 1. Reemplaza "$ NUMERO ARS" por "NUMERO pesos" (ignora los puntos de los miles)
+    .replace(/\$\s?([\d.,]+)\s?ARS/gi, "$1 pesos")
+    // 2. Reemplaza "$ NUMERO" por "NUMERO pesos"
+    .replace(/\$\s?([\d.,]+)/g, "$1 pesos")
+    // 3. Por si quedó algún "ARS" suelto sin número
+    .replace(/\bARS\b/g, "pesos");
+
+  return cleanMsg;
 };
 
 // ============================================================================
@@ -82,7 +94,7 @@ export const neuroToast = (
         </div>
       ),
       { duration: 8000, position: "top-right" },
-    ); // Dura 8 segundos para que dé tiempo a leer
+    );
 
     speakAlert(
       "Operación bloqueada. Por favor, abra la caja registradora para continuar.",
@@ -97,6 +109,8 @@ export const neuroToast = (
       : type === "error"
         ? "Se ha producido un error en el sistema"
         : "Aviso de sistema";
+
+  // 🛡️ Pasamos el texto por nuestro nuevo filtro de fonética de moneda
   const safeSpeak = sanitizeForVoice(speakMsg || msg, defaultVoice);
 
   // Limpieza visual por si el backend mandó código basura
@@ -117,5 +131,5 @@ export const neuroToast = (
     toast(formattedMsg, { icon: "⚠️" });
   }
 
-  speakAlert(safeSpeak);
+  speakAlert(safeSpeak); // Habla el texto limpio
 };

@@ -15,12 +15,12 @@ import { neuroToast } from "../../../shared/utils/neuroToast";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:4000/api";
 
-// 🛡️ INTERFAZ ESTRICTA: Molde exacto del Proveedor
+// 🛡️ INTERFAZ ALINEADA CON EL BACKEND
 export interface SupplierProfile {
   id: number;
-  name: string;
-  document?: string | null;
-  contactName?: string | null; // El viajante/preventista
+  companyName: string; // 🔄 Cambiado
+  cuit?: string | null; // 🔄 Cambiado
+  contactName?: string | null;
   phone?: string | null;
   email?: string | null;
   address?: string | null;
@@ -42,31 +42,31 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
   token,
   supplierToEdit,
 }) => {
+  // 🛡️ ESTADO ALINEADO
   const [formData, setFormData] = useState({
-    name: "",
+    companyName: "",
     contactName: "",
     phone: "",
     email: "",
     address: "",
   });
 
-  // Para proveedores usamos directamente CUIT
   const [documentValue, setDocumentValue] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (supplierToEdit) {
       setFormData({
-        name: supplierToEdit.name,
+        companyName: supplierToEdit.companyName,
         contactName: supplierToEdit.contactName || "",
         phone: supplierToEdit.phone || "",
         email: supplierToEdit.email || "",
         address: supplierToEdit.address || "",
       });
-      setDocumentValue(formatCuit(supplierToEdit.document || ""));
+      setDocumentValue(formatCuit(supplierToEdit.cuit || ""));
     } else {
       setFormData({
-        name: "",
+        companyName: "",
         contactName: "",
         phone: "",
         email: "",
@@ -76,9 +76,8 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
     }
   }, [supplierToEdit, isOpen]);
 
-  // 🛡️ MÁSCARA INTELIGENTE SOLO PARA CUIT (Poka-Yoke)
   const formatCuit = (value: string) => {
-    const raw = value.replace(/\D/g, ""); // Extrae solo números
+    const raw = value.replace(/\D/g, "");
     const limited = raw.substring(0, 11);
     let formatted = limited;
 
@@ -95,7 +94,10 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
     setDocumentValue(formatCuit(e.target.value));
   };
 
-  const isReadyToSubmit = formData.name.trim().length >= 2 && !isSubmitting;
+  const isReadyToSubmit =
+    formData.companyName.trim().length >= 2 &&
+    formData.phone.trim().length >= 8 &&
+    !isSubmitting;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,9 +107,12 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
     try {
       const rawDocument = documentValue.replace(/\D/g, "");
 
+      // 🛡️ PAYLOAD PERFECTO PARA ZOD
       const payload = {
         ...formData,
-        document: rawDocument || undefined,
+        cuit: rawDocument || undefined,
+        // Zod exige que si mandamos email vacío, no lo mandemos o sea null válido
+        email: formData.email.trim() === "" ? undefined : formData.email,
       };
 
       const url = supplierToEdit
@@ -193,9 +198,9 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
                   />
                   <input
                     type="text"
-                    value={formData.name}
+                    value={formData.companyName}
                     onChange={(e) =>
-                      setFormData({ ...formData, name: e.target.value })
+                      setFormData({ ...formData, companyName: e.target.value })
                     }
                     required
                     className="w-full bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-700 rounded-xl pl-10 pr-4 py-3 font-bold text-slate-800 dark:text-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-colors"
@@ -245,8 +250,9 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
               </div>
 
               <div>
-                <label className="text-xs font-black uppercase text-slate-400 mb-1.5 block">
-                  Teléfono / WhatsApp
+                <label className="text-xs font-black uppercase text-slate-400 mb-1.5 block flex justify-between">
+                  <span>Teléfono / WhatsApp</span>
+                  <span className="text-red-400">*</span>
                 </label>
                 <div className="relative">
                   <Phone
@@ -255,6 +261,7 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
                   />
                   <input
                     type="text"
+                    required
                     value={formData.phone}
                     onChange={(e) =>
                       setFormData({ ...formData, phone: e.target.value })
@@ -267,7 +274,7 @@ export const SupplierModal: React.FC<SupplierModalProps> = ({
 
               <div>
                 <label className="text-xs font-black uppercase text-slate-400 mb-1.5 block">
-                  Correo Electrónico
+                  Corréo Electrónico
                 </label>
                 <div className="relative">
                   <Mail

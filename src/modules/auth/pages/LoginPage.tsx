@@ -42,10 +42,8 @@ export const LoginPage = () => {
   const isFormValid = isValidEmail && password.length >= 6;
 
   // ============================================================================
-  // 🌊 MOTOR DE AUDIO SINCRONIZADO (Olas fluidas)
+  // 🌊 MOTOR DE AUDIO SINCRONIZADO
   // ============================================================================
-  const [waveIntensity, setWaveIntensity] = useState(0);
-
   useEffect(() => {
     waveAudioRef.current = new Audio(ambientSound);
     waveAudioRef.current.loop = true;
@@ -58,18 +56,11 @@ export const LoginPage = () => {
 
       let time = 0;
       volumeInterval = setInterval(() => {
-        time += 0.05; // Movimiento más suave y fluido
-        const swell = 0.5 + Math.sin(time) * 0.5; // Normalizado de 0 a 1
-        setWaveIntensity(swell);
-
-        if (waveAudioRef.current) {
-          // El volumen sube y baja orgánicamente con el ritmo del mar
-          waveAudioRef.current.volume = Math.max(
-            0.05,
-            Math.min(0.1 + swell * 0.3, 0.6),
-          );
-        }
-      }, 100);
+        time += 0.1;
+        const swell = 0.22 + Math.sin(time) * 0.12;
+        if (waveAudioRef.current)
+          waveAudioRef.current.volume = Math.max(0.05, Math.min(swell, 1));
+      }, 200);
     } else {
       if (waveAudioRef.current) waveAudioRef.current.pause();
     }
@@ -115,25 +106,19 @@ export const LoginPage = () => {
   };
 
   // ============================================================================
-  // 🎨 ANIMACIONES ORGÁNICAS Y PECES DE PINTURA
+  // 🎨 ANIMACIONES ORGÁNICAS
   // ============================================================================
-
-  // Tarjeta que aparece y luego se queda flotando suavemente
   const formVariants: Variants = {
-    hidden: { opacity: 0, y: 40 },
+    hidden: { opacity: 0, y: 30 },
     show: {
       opacity: 1,
       y: 0,
       transition: {
-        duration: 1,
+        duration: 0.8,
         type: "spring",
-        bounce: 0.3,
+        bounce: 0.4,
         staggerChildren: 0.1,
       },
-    },
-    floating: {
-      y: [0, -8, 0],
-      transition: { duration: 6, repeat: Infinity, ease: "easeInOut" },
     },
   };
 
@@ -142,96 +127,35 @@ export const LoginPage = () => {
     show: { opacity: 1, x: 0, transition: { type: "spring", stiffness: 300 } },
   };
 
-  const currentVisualSwell = 1.0 + waveIntensity * 0.1;
-
   const wave1: Variants = {
     animate: {
       x: ["0%", "-50%"],
-      y: ["0%", "5%", "0%"],
+      y: ["0%", "4%", "0%"],
+      scaleY: [1, 1.05, 1],
       transition: {
-        x: { repeat: Infinity, duration: 25, ease: "linear" },
-        y: { repeat: Infinity, duration: 7, ease: "easeInOut" },
+        x: { repeat: Infinity, duration: 20, ease: "linear" },
+        y: { repeat: Infinity, duration: 6, ease: "easeInOut" },
       },
     },
   };
   const wave2: Variants = {
     animate: {
       x: ["-50%", "0%"],
-      y: ["5%", "0%", "5%"],
+      y: ["4%", "0%", "4%"],
+      scaleY: [1.05, 1, 1.05],
       transition: {
-        x: { repeat: Infinity, duration: 30, ease: "linear" },
-        y: { repeat: Infinity, duration: 9, ease: "easeInOut" },
+        x: { repeat: Infinity, duration: 25, ease: "linear" },
+        y: { repeat: Infinity, duration: 8, ease: "easeInOut" },
       },
     },
   };
 
-  // Peces de pintura saltando desde el mar
-  const fishJump: Variants = {
-    animate: (customDelay) => ({
-      y: ["15vh", "-25vh", "15vh"],
-      x: ["0vw", "15vw", "30vw"],
-      rotate: [-45, 0, 45],
-      scale: [0.5, 1.2, 0.5],
-      opacity: [0, 0.8, 0.8, 0],
-      transition: {
-        duration: 5,
-        repeat: Infinity,
-        ease: "easeInOut",
-        delay: customDelay,
-      },
-    }),
-  };
-
-  const paintColors = ["#ea580c", "#f59e0b", "#fbbf24"];
-
   return (
     <div className="relative min-h-screen flex flex-col items-center justify-center p-4 transition-colors duration-1000 overflow-hidden font-sans bg-slate-100 dark:bg-[#04060C]">
-      {/* FONDO ANIMADO Y PECES SALTANDO */}
+      {/* FONDO ANIMADO DE PINTURA */}
       <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
-        {/* Peces de pintura generados dinámicamente */}
-        <AnimatePresence>
-          {[...Array(3)].map((_, i) => (
-            <motion.div
-              key={i}
-              custom={i * 2.5}
-              variants={fishJump}
-              animate="animate"
-              className="absolute bottom-0 z-0 opacity-80"
-              style={{
-                left: `${10 + i * 25}%`,
-                color: paintColors[i % paintColors.length],
-              }}
-            >
-              {/* SVG de Gota/Pez líquido */}
-              <svg
-                viewBox="0 0 24 24"
-                className="w-12 h-auto drop-shadow-lg"
-                fill="currentColor"
-              >
-                <path
-                  d="M12,2 C12,2 20,8 20,15 C20,19.418 16.418,23 12,23 C7.582,23 4,19.418 4,15 C4,8 12,2 12,2 Z"
-                  style={{
-                    transformOrigin: "center",
-                    transform: "rotate(45deg)",
-                  }}
-                />
-              </svg>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-
-        {/* Esferas de luz que respiran */}
-        <motion.div
-          animate={{ opacity: [0.2, 0.4, 0.2], scale: [1, 1.1, 1] }}
-          transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute top-[10%] left-[20%] w-[400px] h-[400px] bg-brand/30 dark:bg-brand/10 rounded-full blur-[100px]"
-        />
-
-        {/* OLAS DE PINTURA FLUIDAS */}
-        <motion.div
-          className="absolute bottom-0 left-0 w-[200%] h-[35vh] opacity-60 dark:opacity-40 mix-blend-multiply dark:mix-blend-screen origin-bottom transform-gpu"
-          style={{ scaleY: currentVisualSwell }}
-        >
+        {/* OLAS DE PINTURA */}
+        <div className="absolute bottom-0 left-0 w-[200%] h-[35vh] opacity-60 dark:opacity-40 mix-blend-multiply dark:mix-blend-screen origin-bottom">
           <motion.div
             variants={wave1}
             animate="animate"
@@ -280,7 +204,7 @@ export const LoginPage = () => {
               ></path>
             </svg>
           </motion.div>
-        </motion.div>
+        </div>
       </div>
 
       {/* BOTONERA FLOTANTE */}
@@ -304,15 +228,18 @@ export const LoginPage = () => {
         </motion.button>
       </div>
 
-      {/* TARJETA DE LOGIN CON LEVITACIÓN */}
+      {/* ========================================================== */}
+      {/* TARJETA DE LOGIN Y EMBLEMA DEL LOGO (Rediseño Estructural) */}
+      {/* ========================================================== */}
       <motion.div
         variants={formVariants}
         initial="hidden"
-        animate={["show", "floating"]}
+        animate="show"
         className="relative z-10 w-full max-w-[420px] flex flex-col items-center"
       >
+        {/* EMBLEMA CIRCULAR FLOTANTE */}
         <motion.div
-          animate={{ y: [0, -6, 0] }}
+          animate={{ y: [0, -10, 0] }}
           transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
           className="relative z-20 mb-[-50px] w-36 h-36 rounded-full bg-[#050300] border-4 border-white/20 dark:border-brand/40 shadow-[0_10px_30px_rgba(245,158,11,0.4)] flex items-center justify-center overflow-hidden"
         >
@@ -324,6 +251,7 @@ export const LoginPage = () => {
           />
         </motion.div>
 
+        {/* FORMULARIO DE CRISTAL */}
         <div className="w-full bg-white/80 dark:bg-[#0a0f1c]/80 backdrop-blur-3xl rounded-[2.5rem] shadow-[0_30px_80px_-15px_rgba(0,0,0,0.3)] border border-white/60 dark:border-slate-700/50 pt-16 pb-10 px-8 sm:px-10 relative z-10">
           <motion.div variants={inputVariants} className="text-center mb-8">
             <h2 className="text-3xl font-black text-slate-800 dark:text-white tracking-tight">

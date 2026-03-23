@@ -34,8 +34,10 @@ export const SuppliersPage = () => {
         headers: { Authorization: `Bearer ${token}` },
       });
       const result = await response.json();
+
+      // 🛡️ El backend de 'getSuppliers' devuelve un array directo, no envuelto en 'data' según tu controller
       if (response.ok) {
-        setSuppliers(result.data || []);
+        setSuppliers(Array.isArray(result) ? result : result.data || []);
       }
     } catch (error) {
       console.log(error);
@@ -58,10 +60,11 @@ export const SuppliersPage = () => {
     setIsModalOpen(true);
   };
 
+  // 🛡️ FILTRO ADAPTADO A COMPANYNAME Y CUIT
   const filteredSuppliers = suppliers.filter(
     (s) =>
-      s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (s.document && s.document.includes(searchTerm)) ||
+      s.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (s.cuit && s.cuit.includes(searchTerm)) ||
       (s.contactName &&
         s.contactName.toLowerCase().includes(searchTerm.toLowerCase())),
   );
@@ -143,11 +146,12 @@ export const SuppliersPage = () => {
                       className="hover:bg-slate-50 dark:hover:bg-slate-800/20 transition-colors"
                     >
                       <td className="p-6">
+                        {/* 🛡️ CORRECCIÓN: IMPRIMIMOS companyName y cuit */}
                         <p className="font-bold text-slate-800 dark:text-white text-lg leading-tight">
-                          {s.name}
+                          {s.companyName}
                         </p>
                         <p className="text-[10px] text-slate-500 font-black uppercase mt-1">
-                          CUIT: {s.document || "No Registrado"}
+                          CUIT: {s.cuit || "No Registrado"}
                         </p>
                       </td>
                       <td className="p-6">

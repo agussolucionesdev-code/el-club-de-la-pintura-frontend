@@ -9,6 +9,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { neuroToast } from "../../../shared/utils/neuroToast";
+// 🛡️ IMPORTANTE: Eliminamos la conexión al Contexto Global acá. Confiamos en la prop de la página.
 
 const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:4000/api";
 
@@ -17,8 +18,8 @@ interface ExpenseModalProps {
   onClose: () => void;
   onSuccess: () => void;
   token: string | null;
-  activeCashRegisterId: number | null;
-  branchId: number; // 🛡️ AGREGAMOS EL ID DE LA SUCURSAL
+  activeCashRegisterId: number | null; // 🛡️ VOLVEMOS A USAR LA PROP ORIGINAL DE LA PÁGINA
+  branchId: number; // 🛡️ VOLVEMOS A USAR LA PROP ORIGINAL DE LA PÁGINA
 }
 
 export const ExpenseModal: React.FC<ExpenseModalProps> = ({
@@ -64,26 +65,27 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
 
   const realAmount = amountInCents / 100;
 
+  // 🛡️ BLINDAJE: Verificamos directamente si la página nos mandó el ID de la caja abierta
   const isReadyToSubmit =
     realAmount > 0 &&
     formData.description.trim().length >= 3 &&
-    activeCashRegisterId &&
+    activeCashRegisterId !== null &&
+    activeCashRegisterId > 0 &&
     !isSubmitting;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isReadyToSubmit) return;
+    if (!isReadyToSubmit || !activeCashRegisterId) return;
 
     setIsSubmitting(true);
     try {
-      // 🛡️ EL PAYLOAD PERFECTO (Ahora sí viaja el ID de la Caja)
       const payload = {
         amount: realAmount,
         category: formData.category,
         reason: formData.description.trim(),
         type: "VARIABLE",
-        branchId: branchId,
-        cashRegisterId: activeCashRegisterId, // <-- ESTA ES LA LLAVE QUE FALTABA
+        branchId: branchId, // 🛡️ Prop de la página
+        cashRegisterId: activeCashRegisterId, // 🛡️ Prop de la página
       };
 
       const response = await fetch(`${API_URL}/expenses`, {
@@ -98,7 +100,9 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
       const result = await response.json();
 
       if (!response.ok)
-        throw new Error(result.error || "Fallo al registrar el gasto.");
+        throw new Error(
+          result.error || result.message || "Fallo al registrar el gasto.",
+        );
 
       neuroToast(
         result.message || "Egreso registrado correctamente.",
@@ -109,7 +113,6 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({
     } catch (error: unknown) {
       const errorMsg =
         error instanceof Error ? error.message : "Error al procesar el egreso.";
-      // 🛡️ Mostramos exactamente el error que manda el servidor (Fondos Insuficientes)
       neuroToast(errorMsg, "error", "Operación rechazada.");
     } finally {
       setIsSubmitting(false);

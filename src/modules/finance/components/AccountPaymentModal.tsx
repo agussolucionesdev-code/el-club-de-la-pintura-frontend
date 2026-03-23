@@ -8,14 +8,13 @@ import {
   Loader2,
   AlertCircle,
   HandCoins,
+  ShieldCheck, // 🛡️ CORRECCIÓN: Importado ShieldCheck
 } from "lucide-react";
 import { neuroToast } from "../../../shared/utils/neuroToast";
+import { useCashRegister } from "../../../core/context/CashRegisterContext";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:4000/api";
 
-// ============================================================================
-// TIPADO ESTRICTO (ERP Level): Reemplazamos el "any" por el molde exacto
-// ============================================================================
 export interface PendingAccount {
   id: number;
   balance: number;
@@ -37,10 +36,9 @@ export interface PendingAccount {
 interface AccountPaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  account: PendingAccount | null; // <-- ¡ADIÓS AL ANY!
+  account: PendingAccount | null;
   onSuccess: () => void;
   token: string | null;
-  activeCashRegisterId: number;
 }
 
 export const AccountPaymentModal: React.FC<AccountPaymentModalProps> = ({
@@ -49,7 +47,6 @@ export const AccountPaymentModal: React.FC<AccountPaymentModalProps> = ({
   account,
   onSuccess,
   token,
-  activeCashRegisterId,
 }) => {
   const [amount, setAmount] = useState<string>("");
   const [paymentMethod, setPaymentMethod] = useState<"CASH" | "TRANSFER">(
@@ -57,19 +54,20 @@ export const AccountPaymentModal: React.FC<AccountPaymentModalProps> = ({
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const { activeRegister, isLoadingRegister } = useCashRegister();
+
   if (!isOpen || !account) return null;
 
   const parsedAmount = Math.abs(Number(amount) || 0);
-  const newBalance = account.balance - parsedAmount;
+  const newBalance = account.balance - parsedAmount; // 🛡️ SE USA MÁS ABAJO EN EL JSX
 
-  // Blindaje Poka-Yoke
   const isInvalidAmount = parsedAmount <= 0 || parsedAmount > account.balance;
   const isReadyToSubmit =
-    !isInvalidAmount && !isSubmitting && activeCashRegisterId > 0;
+    !isInvalidAmount && !isSubmitting && activeRegister !== null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isReadyToSubmit) return;
+    if (!isReadyToSubmit || !activeRegister) return;
 
     setIsSubmitting(true);
     try {
@@ -77,7 +75,7 @@ export const AccountPaymentModal: React.FC<AccountPaymentModalProps> = ({
         saleId: account.id,
         amount: parsedAmount,
         paymentMethod,
-        cashRegisterId: activeCashRegisterId,
+        cashRegisterId: activeRegister.id,
         branchId: account.branchId,
       };
 
@@ -94,7 +92,9 @@ export const AccountPaymentModal: React.FC<AccountPaymentModalProps> = ({
 
       if (!response.ok) {
         throw new Error(
-          result.error || "Fallo al registrar la integración de saldo.",
+          result.error ||
+            result.message ||
+            "Fallo estructural en el Backend (Error 400).",
         );
       }
 
@@ -105,6 +105,7 @@ export const AccountPaymentModal: React.FC<AccountPaymentModalProps> = ({
     } catch (error: unknown) {
       const errorMsg =
         error instanceof Error ? error.message : "Error desconocido al cobrar.";
+      console.error("Detalle del Error:", errorMsg);
       neuroToast(errorMsg, "error");
     } finally {
       setIsSubmitting(false);
@@ -149,6 +150,24 @@ export const AccountPaymentModal: React.FC<AccountPaymentModalProps> = ({
           </div>
 
           <form onSubmit={handleSubmit} className="p-6 space-y-6">
+            {/* ALERTAS DE CAJA GLOBAL */}
+            {isLoadingRegister ? (
+              <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl flex items-center gap-2 text-slate-500 text-xs font-bold animate-pulse">
+                <Loader2 size={16} className="animate-spin" /> Sincronizando con
+                caja...
+              </div>
+            ) : !activeRegister ? (
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-3 rounded-xl flex items-center gap-2 text-red-600 dark:text-red-400 text-xs font-bold">
+                <AlertCircle size={16} /> Atención: La caja registradora se
+                encuentra cerrada.
+              </div>
+            ) : (
+              <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 p-3 rounded-xl flex items-center gap-2 text-emerald-600 dark:text-emerald-400 text-xs font-bold">
+                <ShieldCheck size={16} /> Caja #{activeRegister.id}{" "}
+                sincronizada.
+              </div>
+            )}
+
             <div className="bg-slate-50 dark:bg-slate-900/40 p-4 rounded-2xl border border-slate-100 dark:border-slate-800">
               <div className="flex justify-between items-center mb-3">
                 <span className="text-xs font-black uppercase text-slate-400">
@@ -166,15 +185,13 @@ export const AccountPaymentModal: React.FC<AccountPaymentModalProps> = ({
                   {account.pickedUpBy || "No especificado"}
                 </span>
               </div>
-
               <div className="h-px w-full bg-slate-200 dark:bg-slate-700/50 mb-4"></div>
-
               <div className="flex justify-between items-end">
                 <span className="text-xs font-black uppercase text-slate-500">
                   Saldo Pendiente
                 </span>
                 <span className="text-3xl font-black text-red-500">
-                  ${account.balance.toLocaleString()}
+                  $ {account.balance.toLocaleString("es-AR")} ARS
                 </span>
               </div>
             </div>
@@ -220,13 +237,9 @@ export const AccountPaymentModal: React.FC<AccountPaymentModalProps> = ({
                   className={`w-full bg-slate-50 dark:bg-slate-900 border rounded-xl pl-8 pr-4 py-4 text-2xl font-black focus:outline-none focus:ring-1 transition-all ${parsedAmount > account.balance ? "border-red-400 text-red-500 focus:border-red-500" : "border-slate-200 dark:border-slate-700 text-slate-800 dark:text-white focus:border-emerald-500"}`}
                 />
               </div>
-              {parsedAmount > account.balance && (
-                <p className="text-xs font-bold text-red-500 mt-2 flex items-center gap-1">
-                  <AlertCircle size={14} /> El pago no puede superar la deuda.
-                </p>
-              )}
             </div>
 
+            {/* 🛡️ CORRECCIÓN: ACÁ SE USA newBalance */}
             <AnimatePresence>
               {parsedAmount > 0 && parsedAmount <= account.balance && (
                 <motion.div
@@ -238,7 +251,7 @@ export const AccountPaymentModal: React.FC<AccountPaymentModalProps> = ({
                     Nuevo Saldo Restante:
                   </span>
                   <span className="font-black">
-                    ${newBalance.toLocaleString()}
+                    $ {newBalance.toLocaleString("es-AR")} ARS
                   </span>
                 </motion.div>
               )}
@@ -248,15 +261,7 @@ export const AccountPaymentModal: React.FC<AccountPaymentModalProps> = ({
               type="submit"
               disabled={!isReadyToSubmit}
               className={`w-full py-4 rounded-xl font-black text-sm transition-all flex items-center justify-center space-x-2 mt-2
-                ${
-                  isSubmitting
-                    ? "bg-slate-200 dark:bg-slate-800 text-slate-500 cursor-wait"
-                    : !activeCashRegisterId
-                      ? "bg-red-100 dark:bg-red-900/30 text-red-500 cursor-not-allowed"
-                      : isInvalidAmount
-                        ? "bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed"
-                        : "bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/30 hover:scale-[1.02]"
-                }`}
+                ${isSubmitting ? "bg-slate-200 dark:bg-slate-800 text-slate-500 cursor-wait" : !activeRegister ? "bg-red-100 dark:bg-red-900/30 text-red-500 cursor-not-allowed" : isInvalidAmount ? "bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-not-allowed" : "bg-emerald-500 hover:bg-emerald-600 text-white shadow-lg shadow-emerald-500/30 hover:scale-[1.02]"}`}
             >
               {isSubmitting ? (
                 <Loader2 className="animate-spin" size={20} />
@@ -264,7 +269,7 @@ export const AccountPaymentModal: React.FC<AccountPaymentModalProps> = ({
                 <Save size={20} />
               )}
               <span>
-                {!activeCashRegisterId
+                {!activeRegister
                   ? "ERROR: CAJA CERRADA"
                   : isInvalidAmount
                     ? "INGRESÁ UN MONTO VÁLIDO"
