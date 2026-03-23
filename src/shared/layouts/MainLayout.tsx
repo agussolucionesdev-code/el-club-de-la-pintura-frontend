@@ -20,7 +20,12 @@ import {
   Package,
   Power,
   Menu,
-  PackageSearch, // <-- INYECCIÓN: Ícono para auditoría de inventario
+  PackageSearch,
+  Calculator,
+  Building2,
+  HandCoins,
+  Factory,
+  ArrowDownRight, // <-- INYECCIÓN FASE 4: Ícono para Gastos/Egresos
 } from "lucide-react";
 // Importación de recursos gráficos estáticos
 import logoImg from "../../assets/images/logo.png";
@@ -51,12 +56,21 @@ export const MainLayout = () => {
   const navLinks = [
     { path: "/", icon: LayoutDashboard, label: "Bóveda Estratégica" },
     { path: "/sales", icon: ShoppingCart, label: "Terminal de Ventas" },
-    { path: "/products", icon: Package, label: "Catálogo Maestro" }, // <-- RENOMBRAMIENTO: Diferenciación de ABM
+    { path: "/caja", icon: Calculator, label: "Caja Registradora" },
+    {
+      path: "/cuentas-corrientes",
+      icon: HandCoins,
+      label: "Cuentas Corrientes",
+    },
+    { path: "/gastos", icon: ArrowDownRight, label: "Gastos y Egresos" }, // <-- INYECCIÓN: Link de Gastos
+    { path: "/products", icon: Package, label: "Catálogo Maestro" },
     {
       path: "/inventory",
       icon: PackageSearch,
       label: "Auditoría de Inventario",
-    }, // <-- INYECCIÓN: Nueva ruta de stock
+    },
+    { path: "/customers", icon: Building2, label: "Directorio Clientes" },
+    { path: "/proveedores", icon: Factory, label: "Directorio Proveedores" },
   ];
 
   // Renderizado del árbol DOM (Layout Principal)
@@ -85,7 +99,7 @@ export const MainLayout = () => {
         </div>
 
         {/* Renderizado iterativo de enlaces de navegación */}
-        <nav className="flex-1 overflow-y-auto py-6 md:py-8 px-4 md:px-5 space-y-2 md:space-y-3">
+        <nav className="flex-1 overflow-y-auto py-6 md:py-8 px-4 md:px-5 space-y-2 md:space-y-3 custom-scrollbar">
           {navLinks.map((item) => {
             const isActive = location.pathname === item.path;
             return (
@@ -93,7 +107,7 @@ export const MainLayout = () => {
                 key={item.path}
                 to={item.path}
                 onClick={() => setIsMobileMenuOpen(false)}
-                className={`flex items-center space-x-4 px-4 py-3 md:py-3.5 rounded-2xl transition-all duration-300 group relative overflow-hidden ${isActive ? "bg-brand/10 text-brand border border-brand/20" : "text-slate-400 hover:bg-white/5 hover:text-slate-200"}`}
+                className={`flex items-center space-x-4 px-4 py-3 md:py-3.5 rounded-2xl transition-all duration-300 group relative overflow-hidden ${isActive ? "bg-brand/10 text-brand border border-brand/20 shadow-sm" : "text-slate-400 hover:bg-white/5 hover:text-slate-200"}`}
               >
                 {/* Indicador visual de ruta activa */}
                 {isActive && (
@@ -101,9 +115,9 @@ export const MainLayout = () => {
                 )}
                 <item.icon
                   size={20}
-                  className={`md:w-[22px] md:h-[22px] ${isActive ? "drop-shadow-[0_0_8px_rgba(245,158,11,0.5)]" : "group-hover:scale-110 transition-transform duration-300"}`}
+                  className={`md:w-[22px] md:h-[22px] shrink-0 ${isActive ? "drop-shadow-[0_0_8px_rgba(245,158,11,0.5)] text-brand" : "group-hover:scale-110 transition-transform duration-300"}`}
                 />
-                <span className="font-bold text-xs md:text-sm tracking-wide">
+                <span className="font-bold text-xs md:text-sm tracking-wide truncate">
                   {item.label}
                 </span>
               </Link>

@@ -13,6 +13,14 @@ import { POSPage } from "./modules/pos/pages/POSPage";
 import { InventoryPage } from "./modules/stock/pages/InventoryPage";
 import { CashRegisterPage } from "./modules/cash-register/pages/CashRegisterPage";
 
+// 🛡️ PANTALLAS FASE 3 (Cuentas por Cobrar)
+import { AccountsReceivablePage } from "./modules/finance/pages/AccountsReceivablePage";
+import { CustomersPage } from "./modules/customer/pages/CustomersPage";
+
+// 🛡️ PANTALLAS FASE 4 (Logística y Gastos)
+import { SuppliersPage } from "./modules/supplier/pages/SuppliersPage";
+import { ExpensesPage } from "./modules/expense/pages/ExpensesPage"; // <-- INYECCIÓN: Ruta de Gastos
+
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated } = useAuth();
   if (isAuthenticated) return <Navigate to="/" replace />;
@@ -30,14 +38,12 @@ function App() {
           <Toaster
             position="top-right"
             toastOptions={{
-              // Duración de 4 segundos
               duration: 4000,
-              // Clases globales para todas las alertas (Glassmorphism)
               className:
                 "!bg-white/90 dark:!bg-[#0a0f1c]/90 !backdrop-blur-xl !shadow-[0_20px_50px_rgba(0,0,0,0.15)] !border !border-slate-200 dark:!border-slate-800 !rounded-3xl !px-6 !py-4 !text-sm !font-black !tracking-tight !text-slate-800 dark:!text-white",
               success: {
                 iconTheme: {
-                  primary: "#10b981", // Verde Esmeralda (Éxito)
+                  primary: "#10b981",
                   secondary: "#ffffff",
                 },
                 className:
@@ -45,7 +51,7 @@ function App() {
               },
               error: {
                 iconTheme: {
-                  primary: "#ef4444", // Rojo Peligro
+                  primary: "#ef4444",
                   secondary: "#ffffff",
                 },
                 className:
@@ -70,6 +76,16 @@ function App() {
               <Route path="/sales" element={<POSPage />} />
               <Route path="/inventory" element={<InventoryPage />} />
               <Route path="/caja" element={<CashRegisterPage />} />
+              {/* 🛡️ RUTAS FASE 3 */}
+              <Route path="/customers" element={<CustomersPage />} />
+              <Route
+                path="/cuentas-corrientes"
+                element={<AccountsReceivablePage />}
+              />
+              {/* 🛡️ RUTAS FASE 4 */}
+              <Route path="/proveedores" element={<SuppliersPage />} />
+              <Route path="/gastos" element={<ExpensesPage />} />{" "}
+              {/* <-- INYECCIÓN: Ruta de Gastos */}
             </Route>
 
             <Route path="*" element={<Navigate to="/" replace />} />

@@ -23,6 +23,9 @@ import {
   User as UserIcon,
   Search,
   PackageOpen,
+  HandCoins, // 🛡️ NUEVO ÍCONO PARA CUENTA CORRIENTE
+  ShieldAlert, // 🛡️ NUEVO ÍCONO DE ALERTA
+  PenTool, // 🛡️ NUEVO ÍCONO PARA QUIÉN RETIRA
 } from "lucide-react";
 import toast from "react-hot-toast";
 
@@ -50,18 +53,14 @@ interface ExtendedUser {
   branches?: { id: number; name: string }[];
 }
 
-// ==========================================
-// MOTOR NEURO-VOCAL (Síntesis de Voz)
-// ==========================================
 const speakAlert = (text: string) => {
-  // Preparado para el futuro panel de configuración
   if (localStorage.getItem("muted_alerts") === "true") return;
 
   if ("speechSynthesis" in window) {
-    window.speechSynthesis.cancel(); // Corta cualquier audio anterior
+    window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "es-AR"; // Acento local
-    utterance.rate = 1.1; // Ligeramente más rápido para dinamismo
+    utterance.lang = "es-AR";
+    utterance.rate = 1.1;
     utterance.pitch = 1.0;
     window.speechSynthesis.speak(utterance);
   }
@@ -81,10 +80,15 @@ export const POSPage = () => {
 
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+
   const [selectedCustomerId, setSelectedCustomerId] = useState<number | null>(
     null,
   );
   const [paymentMethod, setPaymentMethod] = useState("CASH");
+
+  // 🛡️ NUEVO ESTADO: Quién se lleva la mercadería fiada
+  const [pickedUpBy, setPickedUpBy] = useState("");
+
   const [isProcessing, setIsProcessing] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(true);
 
@@ -112,10 +116,8 @@ export const POSPage = () => {
     { text: "SISTEMA EN TIEMPO REAL", icon: Landmark, delay: "text-blue-500" },
   ];
 
-  // Wrapper personalizado para Toast + Voz + Neuro-Copywriting
   const neuroToast = useCallback(
     (msg: string, type: "success" | "error" | "warning", speakMsg?: string) => {
-      // Letra más grande y clara (Neuro-diseño)
       const formattedMsg = (
         <span className="text-lg font-black tracking-tight">{msg}</span>
       );
@@ -124,15 +126,11 @@ export const POSPage = () => {
       else if (type === "error") toast.error(formattedMsg);
       else toast(formattedMsg, { icon: "⚠️" });
 
-      // La voz puede decir algo más corto e impactante que el texto
       speakAlert(speakMsg || msg);
     },
     [],
   );
 
-  // ==========================================
-  // HEARTBEAT: Sincronización en Tiempo Real
-  // ==========================================
   const checkRegisterStatus = useCallback(async () => {
     if (!token) return;
     try {
@@ -160,11 +158,9 @@ export const POSPage = () => {
       }
     } catch (e) {
       console.log(e);
-      // Fallo silencioso para no molestar al cajero si hay un micro-corte de internet
     }
   }, [currentBranchId, token]);
 
-  // Carga inicial pesada (Catálogo y Clientes)
   useEffect(() => {
     const bootstrapPOS = async () => {
       if (!token) {
@@ -213,7 +209,7 @@ export const POSPage = () => {
           );
         }
 
-        await checkRegisterStatus(); // Chequeo inicial de caja
+        await checkRegisterStatus();
       } catch (error) {
         console.log(error);
         neuroToast(
@@ -229,7 +225,6 @@ export const POSPage = () => {
     bootstrapPOS();
   }, [token, navigate, logout, checkRegisterStatus, neuroToast]);
 
-  // Activación del Heartbeat (Latido cada 3 segundos y al hacer foco en la ventana)
   useEffect(() => {
     const interval = setInterval(checkRegisterStatus, 3000);
     window.addEventListener("focus", checkRegisterStatus);
@@ -239,9 +234,6 @@ export const POSPage = () => {
     };
   }, [checkRegisterStatus]);
 
-  // ==========================================
-  // LÓGICA DE CARRITO Y BÚSQUEDA
-  // ==========================================
   const addToCart = (product: Product) => {
     setCart((prev) => {
       const existing = prev.find((item) => item.id === product.id);
@@ -256,7 +248,6 @@ export const POSPage = () => {
     });
     setSearchTerm("");
     searchInputRef.current?.focus();
-    // Sonido sutil opcional (se puede agregar luego)
   };
 
   const updateQuantity = (id: string | number, delta: number) => {
@@ -292,7 +283,6 @@ export const POSPage = () => {
     }
   };
 
-  // Motor de Búsqueda
   const filteredProducts = useMemo(() => {
     const s = searchTerm.toLowerCase();
     return products.filter(
@@ -317,9 +307,13 @@ export const POSPage = () => {
     0,
   );
 
-  // ==========================================
-  // FINALIZACIÓN DE VENTA
-  // ==========================================
+  // 🛡️ LÓGICA POKA-YOKE (A prueba de errores para Cuentas Corrientes)
+  const isCreditAccount = paymentMethod === "CREDIT_ACCOUNT";
+  const isMissingCreditInfo =
+    isCreditAccount && (!selectedCustomerId || pickedUpBy.trim().length < 3);
+  const isReadyToPay =
+    cart.length > 0 && !isProcessing && activeRegister && !isMissingCreditInfo;
+
   const handleCheckout = async () => {
     if (!activeRegister || !activeRegister.id) {
       return neuroToast(
@@ -334,6 +328,12 @@ export const POSPage = () => {
         "warning",
         "Por favor, ingrese productos.",
       );
+    if (isMissingCreditInfo)
+      return neuroToast(
+        "Faltan Datos",
+        "error",
+        "Complete los datos para la Cuenta Corriente.",
+      );
 
     setIsProcessing(true);
 
@@ -344,7 +344,8 @@ export const POSPage = () => {
       customerId: selectedCustomerId ? Number(selectedCustomerId) : null,
       totalAmount: Number(totalAmount) > 0 ? Number(totalAmount) : 0.01,
       paymentMethod,
-      status: paymentMethod === "CREDIT_ACCOUNT" ? "PENDING" : "PAID",
+      pickedUpBy: isCreditAccount ? pickedUpBy.trim() : undefined, // 🛡️ INYECTAMOS AL AUTORIZADO
+      status: isCreditAccount ? "PENDING" : "PAID",
       items: cart.map((item) => ({
         productId: Number(item.id),
         quantity: Number(item.cartQuantity),
@@ -372,10 +373,18 @@ export const POSPage = () => {
         throw new Error(result.error || "Fallo transaccional.");
       }
 
-      neuroToast("Cobro Exitoso", "success", "Venta registrada correctamente.");
+      neuroToast(
+        isCreditAccount ? "Cuenta Corriente Generada" : "Cobro Exitoso",
+        "success",
+        isCreditAccount
+          ? "Deuda registrada."
+          : "Venta registrada correctamente.",
+      );
       setCart([]);
       setSelectedCustomerId(null);
-      checkRegisterStatus(); // Forzamos actualización de caja instantánea tras cobrar
+      setPickedUpBy(""); // Limpiamos el campo
+      setPaymentMethod("CASH"); // Volvemos a efectivo por defecto
+      checkRegisterStatus();
     } catch (error: unknown) {
       console.log(error);
       neuroToast(
@@ -400,6 +409,7 @@ export const POSPage = () => {
         />
 
         <div className="flex flex-col lg:flex-row gap-6 flex-1 overflow-hidden">
+          {/* PANEL IZQUIERDO: BÚSQUEDA Y PRODUCTOS */}
           <div className="w-full lg:w-[60%] xl:w-[65%] flex flex-col space-y-4">
             <div className="bg-white dark:bg-[#0a0f1c] border border-slate-200 dark:border-slate-800 rounded-3xl p-2 shadow-sm flex items-center">
               <Search className="text-slate-400 ml-4 mr-3" size={24} />
@@ -432,7 +442,7 @@ export const POSPage = () => {
                     <PackageOpen
                       size={48}
                       className="mx-auto mb-4 opacity-50"
-                    />
+                    />{" "}
                     Sin coincidencias.
                   </motion.div>
                 ) : (
@@ -509,6 +519,7 @@ export const POSPage = () => {
             )}
           </div>
 
+          {/* PANEL DERECHO: TICKET Y COBRO */}
           <div className="w-full lg:w-[40%] xl:w-[35%] flex flex-col bg-white dark:bg-[#0a0f1c] border border-slate-200 dark:border-slate-800 rounded-[2.5rem] shadow-xl overflow-hidden shrink-0">
             <div className="p-6 border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-between shrink-0">
               <h2 className="text-xl font-black text-slate-800 dark:text-white flex items-center">
@@ -526,7 +537,8 @@ export const POSPage = () => {
               )}
             </div>
 
-            <div className="p-4 bg-slate-50 dark:bg-slate-900/40 border-b border-slate-100 dark:border-slate-800 shrink-0">
+            {/* SECCIÓN DE CLIENTE Y CUENTA CORRIENTE */}
+            <div className="p-4 bg-slate-50 dark:bg-slate-900/40 border-b border-slate-100 dark:border-slate-800 shrink-0 space-y-3">
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
                   <UserIcon size={18} />
@@ -538,7 +550,9 @@ export const POSPage = () => {
                       e.target.value ? Number(e.target.value) : null,
                     )
                   }
-                  className="w-full pl-12 pr-4 py-3.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-black text-slate-700 dark:text-white appearance-none focus:outline-none focus:ring-2 focus:ring-brand/50 cursor-pointer shadow-sm transition-all"
+                  className={`w-full pl-12 pr-4 py-3.5 bg-white dark:bg-slate-800 border rounded-2xl text-sm font-black text-slate-700 dark:text-white appearance-none focus:outline-none focus:ring-2 focus:ring-brand/50 cursor-pointer shadow-sm transition-all
+                    ${isCreditAccount && !selectedCustomerId ? "border-red-400 focus:ring-red-500/50" : "border-slate-200 dark:border-slate-700"}
+                  `}
                 >
                   <option value="">CONSUMIDOR FINAL</option>
                   {Array.isArray(customers) &&
@@ -548,9 +562,40 @@ export const POSPage = () => {
                       </option>
                     ))}
                 </select>
+                {isCreditAccount && !selectedCustomerId && (
+                  <p className="text-[10px] font-bold text-red-500 mt-1.5 flex items-center gap-1">
+                    <ShieldAlert size={12} /> REQUERIDO PARA FIAR
+                  </p>
+                )}
               </div>
+
+              {/* Input mágico para Cuenta Corriente */}
+              <AnimatePresence>
+                {isCreditAccount && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="relative overflow-hidden"
+                  >
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-amber-500">
+                      <PenTool size={18} />
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="DNI y Nombre de quien retira..."
+                      value={pickedUpBy}
+                      onChange={(e) => setPickedUpBy(e.target.value)}
+                      className={`w-full pl-12 pr-4 py-3.5 bg-amber-50 dark:bg-amber-900/10 border rounded-2xl text-sm font-black text-amber-900 dark:text-amber-100 placeholder-amber-400/70 focus:outline-none transition-all
+                        ${isCreditAccount && pickedUpBy.trim().length < 3 ? "border-red-400" : "border-amber-200 dark:border-amber-800/50"}
+                      `}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
+            {/* CARRITO DE COMPRAS */}
             <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-3">
               <AnimatePresence>
                 {cart.length === 0 ? (
@@ -619,21 +664,31 @@ export const POSPage = () => {
               </AnimatePresence>
             </div>
 
+            {/* SECCIÓN DE COBRO */}
             <div className="p-6 bg-slate-50 dark:bg-slate-900/80 border-t border-slate-200 dark:border-slate-800 shrink-0">
-              <div className="grid grid-cols-4 gap-2 mb-6">
+              {/* 🛡️ NUEVA GRILLA DE 5 MÉTODOS DE PAGO */}
+              <div className="grid grid-cols-5 gap-2 mb-6">
                 {[
                   { id: "CASH", icon: Banknote, label: "Efectivo" },
                   { id: "DEBIT", icon: CreditCard, label: "Débito" },
                   { id: "CREDIT", icon: Landmark, label: "Crédito" },
                   { id: "TRANSFER", icon: Smartphone, label: "Transf." },
+                  { id: "CREDIT_ACCOUNT", icon: HandCoins, label: "Cta. Cte." }, // EL QUINTO ELEMENTO
                 ].map((m) => (
                   <button
                     key={m.id}
                     onClick={() => setPaymentMethod(m.id)}
-                    className={`flex flex-col items-center justify-center py-3 rounded-2xl border-2 transition-all ${paymentMethod === m.id ? "bg-brand/10 border-brand text-brand shadow-sm" : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:border-brand/40"}`}
+                    className={`flex flex-col items-center justify-center py-3 rounded-2xl border-2 transition-all 
+                      ${
+                        paymentMethod === m.id && m.id === "CREDIT_ACCOUNT"
+                          ? "bg-amber-500/10 border-amber-500 text-amber-600 shadow-sm"
+                          : paymentMethod === m.id
+                            ? "bg-brand/10 border-brand text-brand shadow-sm"
+                            : "bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 hover:border-brand/40"
+                      }`}
                   >
                     <m.icon size={20} className="mb-1" />
-                    <span className="text-[9px] font-black uppercase tracking-tighter">
+                    <span className="text-[8px] font-black uppercase tracking-tighter truncate w-full text-center px-1">
                       {m.label}
                     </span>
                   </button>
@@ -644,20 +699,34 @@ export const POSPage = () => {
                 <span className="text-xs font-black text-slate-400 uppercase tracking-widest">
                   Total a Cobrar
                 </span>
-                <span className="text-5xl font-black text-emerald-600 dark:text-emerald-400 tracking-tighter">
-                  <span className="text-2xl text-emerald-500 mr-1">$</span>
+                <span
+                  className={`text-5xl font-black tracking-tighter transition-colors ${isCreditAccount ? "text-amber-500" : "text-emerald-600 dark:text-emerald-400"}`}
+                >
+                  <span
+                    className={`text-2xl mr-1 ${isCreditAccount ? "text-amber-400" : "text-emerald-500"}`}
+                  >
+                    $
+                  </span>
                   {totalAmount.toLocaleString("es-AR")}
                 </span>
               </div>
 
-              {/* Botón Inteligente Neuro-UX */}
               <button
                 onClick={handleCheckout}
-                disabled={cart.length === 0 || isProcessing || !activeRegister}
-                className={`w-full py-5 rounded-2xl flex items-center justify-center space-x-3 text-lg font-black transition-all duration-300 ${cart.length > 0 && !isProcessing && activeRegister ? "bg-emerald-500 hover:bg-emerald-600 text-white shadow-xl shadow-emerald-500/30 hover:scale-[1.02]" : "bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed"}`}
+                disabled={!isReadyToPay}
+                className={`w-full py-5 rounded-2xl flex items-center justify-center space-x-3 text-lg font-black transition-all duration-300 
+                  ${
+                    isReadyToPay && isCreditAccount
+                      ? "bg-amber-500 hover:bg-amber-600 text-white shadow-xl shadow-amber-500/30 hover:scale-[1.02]"
+                      : isReadyToPay
+                        ? "bg-emerald-500 hover:bg-emerald-600 text-white shadow-xl shadow-emerald-500/30 hover:scale-[1.02]"
+                        : "bg-slate-200 dark:bg-slate-800 text-slate-400 cursor-not-allowed"
+                  }`}
               >
                 {isProcessing ? (
                   <Loader2 size={24} className="animate-spin" />
+                ) : isCreditAccount ? (
+                  <ShieldAlert size={24} />
                 ) : (
                   <Banknote size={24} />
                 )}
@@ -668,7 +737,11 @@ export const POSPage = () => {
                       ? "ABRÍ LA CAJA PRIMERO"
                       : cart.length === 0
                         ? "AGREGÁ PRODUCTOS AL CARRITO"
-                        : "FINALIZAR COBRO"}
+                        : isMissingCreditInfo
+                          ? "FALTAN DATOS PARA FIAR"
+                          : isCreditAccount
+                            ? "GENERAR DEUDA"
+                            : "FINALIZAR COBRO"}
                 </span>
               </button>
             </div>
