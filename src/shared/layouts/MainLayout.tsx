@@ -25,7 +25,8 @@ import {
   Building2,
   HandCoins,
   Factory,
-  ArrowDownRight, // <-- INYECCIÓN FASE 4: Ícono para Gastos/Egresos
+  ArrowDownRight,
+  FileSpreadsheet, // <-- INYECCIÓN FASE 4: Ícono para Listas de Precios
 } from "lucide-react";
 // Importación de recursos gráficos estáticos
 import logoImg from "../../assets/images/logo.png";
@@ -62,7 +63,7 @@ export const MainLayout = () => {
       icon: HandCoins,
       label: "Cuentas Corrientes",
     },
-    { path: "/gastos", icon: ArrowDownRight, label: "Gastos y Egresos" }, // <-- INYECCIÓN: Link de Gastos
+    { path: "/gastos", icon: ArrowDownRight, label: "Gastos y Egresos" },
     { path: "/products", icon: Package, label: "Catálogo Maestro" },
     {
       path: "/inventory",
@@ -71,6 +72,7 @@ export const MainLayout = () => {
     },
     { path: "/customers", icon: Building2, label: "Directorio Clientes" },
     { path: "/proveedores", icon: Factory, label: "Directorio Proveedores" },
+    { path: "/price-lists", icon: FileSpreadsheet, label: "Listas de Precios" }, // <-- INYECCIÓN: Link ETL de Precios
   ];
 
   // Renderizado del árbol DOM (Layout Principal)

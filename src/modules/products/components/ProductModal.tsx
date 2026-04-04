@@ -1,5 +1,6 @@
 // Importación de dependencias de React
 import React, { useState, useEffect, useRef } from "react";
+import { neuroToast } from "../../../shared/utils/neuroToast";
 // Importación de iconografía completa (Lucide React)
 import {
   X,
@@ -38,7 +39,6 @@ export interface Product {
   description?: string;
   supplier?: string;
   supplierId?: number;
-  // Corrección Arquitectónica: Adaptación a Array de strings para soporte DB
   images?: string[];
   color?: string;
   metadata?: { initialStockImported?: number; [key: string]: unknown };
@@ -54,6 +54,7 @@ interface ProductModalProps {
 
 // Extracción de variables de entorno para conexión a API
 const API_URL = import.meta.env.VITE_API_URL || "http://127.0.0.1:4000/api";
+
 export const ProductModal = ({
   isOpen,
   onClose,
@@ -84,7 +85,7 @@ export const ProductModal = ({
     stock: 0,
     status: "optimal",
     description: "",
-    images: [], // Inicialización estricta como Array
+    images: [],
     barcode: "",
     sku: "",
   });
@@ -95,7 +96,6 @@ export const ProductModal = ({
       const timer = setTimeout(() => setIsAnimating(true), 10);
 
       if (productToEdit) {
-        // Validación de stock real basado en metadatos o fallback a stock estándar
         const realStock =
           productToEdit.metadata?.initialStockImported !== undefined
             ? Number(productToEdit.metadata.initialStockImported)
@@ -105,15 +105,16 @@ export const ProductModal = ({
           ...productToEdit,
           stock: realStock,
           profitMargin: productToEdit.profitMargin || 30,
-          images: productToEdit.images || [], // Garantía de tipo Array
+          ivaPercentage: productToEdit.ivaPercentage || 21,
+          costPrice: productToEdit.costPrice || 0,
+          retailPrice: productToEdit.retailPrice || 0,
+          images: productToEdit.images || [],
         });
       } else {
-        // Generación de identificador único temporal para nuevos ingresos
         uniqueIdRef.current = Math.floor(
           1000 + Math.random() * 9000,
         ).toString();
 
-        // Limpieza de formulario
         setFormData({
           name: "",
           brand: "",
@@ -134,13 +135,11 @@ export const ProductModal = ({
     }
   }, [isOpen, productToEdit]);
 
-  // Manejo del cierre del modal con animaciones sincronizadas
   const handleClose = () => {
     setIsAnimating(false);
     setTimeout(onClose, 300);
   };
 
-  // Captura de eventos de entrada en campos del formulario
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
@@ -183,7 +182,7 @@ export const ProductModal = ({
     }
   }, [name, category, productToEdit]);
 
-  // Implementación de cálculo automático de rentabilidad financiera
+  // 🛡️ MOTOR DE CÁLCULO FINANCIERO EN TIEMPO REAL
   useEffect(() => {
     if (
       formData.costPrice !== undefined &&
@@ -193,12 +192,14 @@ export const ProductModal = ({
       const cost = Number(formData.costPrice) || 0;
       const margin = Number(formData.profitMargin) || 0;
       const iva = Number(formData.ivaPercentage) || 0;
+
+      // Fórmula: Costo * (1 + Margen%) * (1 + IVA%)
       const finalPrice = cost * (1 + margin / 100) * (1 + iva / 100);
       setFormData((prev) => ({ ...prev, retailPrice: Math.round(finalPrice) }));
     }
   }, [formData.costPrice, formData.profitMargin, formData.ivaPercentage]);
 
-  // Procesamiento y subida de imagen al servidor (Cloudinary)
+  // Procesamiento y subida de imagen al servidor
   const handleImageUpload = async (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
@@ -215,7 +216,6 @@ export const ProductModal = ({
     imgData.append("image", file);
 
     try {
-      // Petición HTTP para transferencia de archivo binario
       const response = await fetch(`${API_URL}/products/upload-image`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
@@ -225,7 +225,6 @@ export const ProductModal = ({
       if (!response.ok) throw new Error("Error al subir imagen");
       const result = await response.json();
 
-      // Inserción de la URL generada dentro del Array de imágenes
       setFormData((prev) => ({
         ...prev,
         images: result.imageUrl ? [result.imageUrl] : [],
@@ -238,7 +237,6 @@ export const ProductModal = ({
     }
   };
 
-  // Verificación de validez estructural del formulario
   const isFormValid =
     formData.name.length > 2 &&
     formData.category !== "" &&
@@ -252,17 +250,29 @@ export const ProductModal = ({
     setIsSubmitting(true);
 
     let calculatedStatus = "optimal";
-    const stockNum = Number(formData.stock);
+    const stockNum = Number(formData.stock) || 0;
     if (stockNum === 0) calculatedStatus = "out";
     else if (stockNum <= 5) calculatedStatus = "critical";
     else if (stockNum <= 15) calculatedStatus = "warning";
 
+    // 🛡️ REFUERZO MATEMÁTICO ANTES DE ENVIAR
+    const finalCost = Number(formData.costPrice) || 0;
+    const finalMargin = Number(formData.profitMargin) || 0;
+    const finalIva = Number(formData.ivaPercentage) || 0;
+
+    // Forzamos el recálculo exacto del precio final para evitar que mande 0
+    const calculatedRetail = Math.round(
+      finalCost * (1 + finalMargin / 100) * (1 + finalIva / 100),
+    );
+
     // Conformación del Payload final alineado al Backend
     const finalProduct = {
       ...formData,
-      price: formData.retailPrice,
-      retailPrice: Number(formData.retailPrice),
-      costPrice: Number(formData.costPrice),
+      costPrice: finalCost,
+      profitMargin: finalMargin,
+      ivaPercentage: finalIva,
+      retailPrice: calculatedRetail, // Usamos el valor forzado
+      price: calculatedRetail, // Fallback de compatibilidad
       stock: stockNum,
       status: calculatedStatus,
       metadata: { initialStockImported: stockNum },
@@ -273,27 +283,24 @@ export const ProductModal = ({
       handleClose();
     } catch (error) {
       console.error("Error al guardar:", error);
+      neuroToast("Error de guardado", "error", "Revisa los datos financieros.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Renderizado condicional basado en estado de animación
   if (!isOpen && !isAnimating) return null;
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-6">
-      {/* Construcción de la capa de desenfoque de fondo */}
       <div
         className={`absolute inset-0 bg-slate-900/70 dark:bg-black/80 backdrop-blur-md transition-opacity duration-300 ${isAnimating && isOpen ? "opacity-100" : "opacity-0"}`}
         onClick={handleClose}
       />
 
-      {/* Construcción del contenedor principal del Modal */}
       <div
         className={`relative w-full max-w-4xl bg-white dark:bg-[#0a0f1c] rounded-[2rem] shadow-[0_20px_60px_rgba(0,0,0,0.2)] dark:shadow-[0_20px_60px_rgba(0,0,0,0.8)] border border-slate-100 dark:border-slate-800 overflow-hidden flex flex-col max-h-[95vh] sm:max-h-[90vh] transition-all duration-300 ease-out transform ${isAnimating && isOpen ? "translate-y-0 opacity-100 scale-100" : "translate-y-8 opacity-0 scale-95"}`}
       >
-        {/* Renderizado de la cabecera del Modal */}
         <div className="flex items-center justify-between px-8 py-6 border-b border-slate-100 dark:border-slate-800/80 bg-gradient-to-r from-slate-50 to-white dark:from-[#050810] dark:to-[#0a0f1c] shrink-0">
           <div className="flex items-center space-x-4">
             <div className="p-3 bg-gradient-to-br from-brand to-amber-400 text-white rounded-2xl shadow-lg shadow-brand/20">
@@ -318,14 +325,12 @@ export const ProductModal = ({
           </button>
         </div>
 
-        {/* Renderizado del formulario principal */}
         <form
           onSubmit={handleSubmit}
           className="overflow-hidden flex flex-col flex-1"
         >
           <div className="p-6 md:p-8 overflow-y-auto flex-1 custom-scrollbar bg-slate-50/30 dark:bg-transparent">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {/* Columna Izquierda: Fotografías y Códigos */}
               <div className="col-span-1 space-y-6">
                 <div>
                   <label className="flex text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 ml-1">
@@ -339,7 +344,6 @@ export const ProductModal = ({
                       <Loader2 size={32} className="animate-spin text-brand" />
                     ) : formData.images && formData.images.length > 0 ? (
                       <>
-                        {/* Extracción segura de la primera imagen del array */}
                         <img
                           src={formData.images[0]}
                           alt="Preview"
@@ -408,7 +412,6 @@ export const ProductModal = ({
                 </div>
               </div>
 
-              {/* Columna Derecha: Información Comercial y Financiera */}
               <div className="col-span-1 md:col-span-2 space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="col-span-1 md:col-span-2 group">
@@ -479,17 +482,17 @@ export const ProductModal = ({
                   </div>
                 </div>
 
-                {/* Panel de Motor de Rentabilidad */}
+                {/* 🛡️ PANEL DE MOTOR DE RENTABILIDAD REFACTORIZADO */}
                 <div className="p-6 rounded-[2rem] bg-gradient-to-br from-slate-50 to-slate-100 border border-slate-200 dark:from-slate-900/80 dark:to-[#0a0f1c] dark:border-slate-800/80 shadow-sm">
                   <div className="flex items-center space-x-3 mb-5">
                     <div className="p-2 bg-brand/10 text-brand rounded-lg">
                       <Calculator size={16} />
                     </div>
                     <span className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest">
-                      Motor de Rentabilidad
+                      Estructura de Costos y Rentabilidad
                     </span>
                   </div>
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div>
                       <label className="flex text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">
                         Costo Base
@@ -511,7 +514,7 @@ export const ProductModal = ({
                     </div>
                     <div>
                       <label className="flex text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">
-                        Ganancia
+                        Margen
                       </label>
                       <div className="relative">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
@@ -529,8 +532,28 @@ export const ProductModal = ({
                       </div>
                     </div>
                     <div>
+                      <label className="flex text-[10px] font-bold text-slate-400 uppercase mb-1.5 ml-1">
+                        IVA
+                      </label>
+                      <div className="relative">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                          <Percent size={14} />
+                        </div>
+                        <select
+                          name="ivaPercentage"
+                          value={formData.ivaPercentage || 21}
+                          onChange={handleChange}
+                          className="w-full pl-8 pr-2 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm font-bold focus:outline-none focus:ring-2 focus:ring-brand/50 transition-all appearance-none cursor-pointer"
+                        >
+                          <option value="21">21.0%</option>
+                          <option value="10.5">10.5%</option>
+                          <option value="0">Exento</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div>
                       <label className="flex text-[10px] font-bold text-emerald-500 uppercase mb-1.5 ml-1">
-                        P. Venta Público *
+                        P. Público
                       </label>
                       <div className="relative">
                         <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-emerald-500">
@@ -600,7 +623,6 @@ export const ProductModal = ({
             </div>
           </div>
 
-          {/* Renderizado de controles de acción (Botones de pie de modal) */}
           <div className="p-6 border-t border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-[#050810] flex justify-end space-x-4 shrink-0">
             <button
               type="button"

@@ -20,7 +20,8 @@ import { CustomersPage } from "./modules/customer/pages/CustomersPage";
 
 // 🛡️ PANTALLAS FASE 4 (Logística y Gastos)
 import { SuppliersPage } from "./modules/supplier/pages/SuppliersPage";
-import { ExpensesPage } from "./modules/expense/pages/ExpensesPage"; // <-- INYECCIÓN: Ruta de Gastos
+import { ExpensesPage } from "./modules/expense/pages/ExpensesPage";
+import { PriceListsPage } from "./modules/price-lists/pages/PriceListPage"; // <-- INYECCIÓN: Ruta ETL de Precios
 
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated } = useAuth();
@@ -86,8 +87,9 @@ function App() {
                 />
                 {/* 🛡️ RUTAS FASE 4 */}
                 <Route path="/proveedores" element={<SuppliersPage />} />
-                <Route path="/gastos" element={<ExpensesPage />} />{" "}
-                {/* <-- INYECCIÓN: Ruta de Gastos */}
+                <Route path="/gastos" element={<ExpensesPage />} />
+                <Route path="/price-lists" element={<PriceListsPage />} />{" "}
+                {/* <-- INYECCIÓN */}
               </Route>
 
               <Route path="*" element={<Navigate to="/" replace />} />
